@@ -1,0 +1,36 @@
+<div class="header">
+    <h1>Reports & Historical Data</h1>
+    <p>Riwayat deteksi kendaraan. Data diambil secara bertahap (Pagination) untuk menjaga performa sistem.</p>
+</div>
+
+<div class="action-row">
+    <button class="btn-export" onclick="exportTodayCSV()">
+        ⬇️ Export CSV (Hari Ini)
+    </button>
+</div>
+
+<div class="card table-card">
+    <h3>Log Deteksi Kendaraan</h3>
+    <div class="table-container">
+        <table id="reports-table">
+            <thead>
+                <tr>
+                    <th>Timestamp (WIB)</th>
+                    <th>Camera ID</th>
+                    <th>Tipe Kendaraan</th>
+                    <th>Arah</th>
+                    <th>Confidence</th>
+                </tr>
+            </thead>
+            <tbody id="reports-body">
+                <tr><td colspan="5" style="text-align:center;color:#8b949e">Loading data...</td></tr>
+            </tbody>
+        </table>
+    </div>
+    
+    <div class="pagination-controls">
+        <button id="btn-prev" onclick="changePage(-1)" disabled>⬅️ Sebelumnya</button>
+        <span id="page-indicator">Halaman 1</span>
+        <button id="btn-next" onclick="changePage(1)">Selanjutnya ➡️</button>
+    </div>
+</div>

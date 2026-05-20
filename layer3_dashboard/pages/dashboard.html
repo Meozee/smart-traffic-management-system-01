@@ -1,0 +1,33 @@
+<div class="header">
+    <h1>Traffic Overview</h1>
+    <p>Data analitik real-time berdasarkan aktivitas kamera aktif hari ini.</p>
+</div>
+
+<div class="analytics-row">
+    <div class="card-group">
+        <div class="card stat">
+            <div class="stat-icon">🚗</div>
+            <h4>Total Kendaraan (Hari Ini)</h4>
+            <p id="total-count">0</p>
+        </div>
+        <div class="card stat">
+            <div class="stat-icon">📊</div>
+            <h4>Status Kepadatan</h4>
+            <p id="density-status">MENGHITUNG...</p>
+        </div>
+    </div>
+
+    <div class="card chart-card">
+        <h3>Today's Hourly Trend</h3>
+        <div class="chart-wrapper">
+            <canvas id="trafficTrendChart"></canvas>
+        </div>
+    </div>
+
+    <div class="card chart-card">
+        <h3>Vehicle Classification</h3>
+        <div class="chart-wrapper">
+            <canvas id="classificationChart"></canvas>
+        </div>
+    </div>
+</div>

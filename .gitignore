@@ -1,0 +1,26 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Model
+*.pt
+*.pth
+
+# Video & images besar
+*.mp4
+*.avi
+*.mov
+
+# Env
+.env
+
+# Logs
+*.log
+
+# Build
+dist/
+build/
+
+# VSCode
+.vscode/

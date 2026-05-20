@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>STMS Dashboard — Central Aceh</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <nav class="topnav">
+        <div class="logo">🚦 STMS <span>Central Aceh</span></div>
+        <div class="nav-right">
+            <div id="status-badge" class="badge">System Online</div>
+            <div id="clock">--:--:--</div>
+        </div>
+    </nav>
+
+    <div class="wrapper">
+        <aside class="sidebar">
+            <button class="nav-btn active" onclick="loadPage('dashboard')">📊 Dashboard</button>
+            <button class="nav-btn" onclick="loadPage('cameras')">📹 Live Cameras</button>
+            <button class="nav-btn" onclick="loadPage('reports')">📑 Reports & History</button>
+            <button class="nav-btn" onclick="loadPage('settings')">⚙️ Settings</button>
+        </aside>
+
+        <main class="main-content" id="app-content">
+            <div class="loading-state">Memuat sistem...</div>
+        </main>
+    </div>
+
+    <script src="js/main.js"></script>
+</body>
+</html>

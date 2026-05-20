@@ -1,0 +1,371 @@
+// ==========================================
+// STMS CORE CONFIGURATION
+// ==========================================
+const API_BASE = "http://localhost:8000/api/v1";
+let trendChart = null;
+let classChart = null;       // Grafik klasifikasi kendaraan (BARU)
+let activeCameraIds = [];
+
+// ==========================================
+// HELPER: Tanggal WIB (UTC+7)
+// ==========================================
+function getTodayWIB() {
+    const now = new Date();
+    const wibOffset = 7 * 60;
+    const localOffset = now.getTimezoneOffset();
+    const wibTime = new Date(now.getTime() + (wibOffset + localOffset) * 60000);
+    return wibTime.toISOString().split('T')[0];
+}
+
+// ==========================================
+// 1. DYNAMIC CAMERA DISCOVERY (UC-01)
+// ==========================================
+async function discoverCameras() {
+    try {
+        const response = await fetch(`${API_BASE}/cameras/`);
+        const cameras = await response.json();
+
+        const container = document.getElementById('camera-feeds-container');
+        if (!container) return;
+
+        activeCameraIds = cameras
+            .filter(c => c.status === 'active')
+            .map(c => c.camera_id);
+
+        // Tampilkan semua kamera aktif dengan tombol arsip
+        container.innerHTML = cameras
+            .filter(c => c.status === 'active')
+            .map(cam => `
+                <div class="card live-feed" id="feed-${cam.camera_id}">
+                    <div class="feed-header">
+                        <h3>LIVE: ${cam.location_name} <span class="cam-id">(${cam.camera_id})</span></h3>
+                        <button class="btn-archive" onclick="toggleArchive('${cam.camera_id}', this)">
+                            📦 Arsip
+                        </button>
+                    </div>
+                    <div class="stream-container">
+                        <img src="${API_BASE}/stream/${cam.camera_id}" 
+                             alt="Stream ${cam.camera_id}"
+                             onerror="this.src=''; this.parentElement.innerHTML='<div class=\'stream-error\'>⚠️ Stream tidak tersedia</div>'">
+                    </div>
+                </div>
+            `).join('') || '<div class="loading-state">Tidak ada kamera aktif.</div>';
+
+        // Refresh tabel kamera di Settings
+        renderCameraTable(cameras);
+
+    } catch (error) {
+        console.error("Gagal mendeteksi kamera:", error);
+        document.getElementById('camera-feeds-container').innerHTML =
+            '<div class="loading-state">⚠️ Gagal koneksi ke server.</div>';
+    }
+}
+
+// ==========================================
+// 2. TOGGLE ARSIP KAMERA (UC-01 Enhancement)
+// ==========================================
+async function toggleArchive(cameraId, btn) {
+    try {
+        btn.disabled = true;
+        btn.textContent = '⏳';
+        const res = await fetch(`${API_BASE}/cameras/${cameraId}/archive`, { method: 'PATCH' });
+        const data = await res.json();
+        alert(data.message);
+        await discoverCameras(); // Refresh tampilan
+    } catch (err) {
+        alert('Gagal mengubah status kamera.');
+        btn.disabled = false;
+        btn.textContent = '📦 Arsip';
+    }
+}
+
+// ==========================================
+// 3. FORM TAMBAH / UPDATE KAMERA (Settings)
+// ==========================================
+async function saveCamera(event) {
+    event.preventDefault();
+    const payload = {
+        camera_id:     document.getElementById('cam-id').value.trim(),
+        location_name: document.getElementById('cam-location').value.trim(),
+        stream_url:    document.getElementById('cam-url').value.trim(),
+        road_capacity: parseInt(document.getElementById('cam-capacity').value) || 100,
+        status:        'active'
+    };
+
+    if (!payload.camera_id || !payload.location_name || !payload.stream_url) {
+        alert('Camera ID, Nama Lokasi, dan Stream URL wajib diisi!');
+        return;
+    }
+
+    try {
+        const res = await fetch(`${API_BASE}/cameras/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        alert(`✅ Kamera "${data.location_name}" berhasil disimpan!`);
+        document.getElementById('camera-form').reset();
+        await discoverCameras();
+    } catch (err) {
+        alert('❌ Gagal menyimpan kamera.');
+    }
+}
+
+// ==========================================
+// 4. TABEL KAMERA DI SETTINGS
+// ==========================================
+function renderCameraTable(cameras) {
+    const tbody = document.getElementById('camera-table-body');
+    if (!tbody) return;
+
+    tbody.innerHTML = cameras.map(cam => `
+        <tr>
+            <td>${cam.camera_id}</td>
+            <td>${cam.location_name}</td>
+            <td>${cam.stream_url || '-'}</td>
+            <td>
+                <span class="badge-status ${cam.status === 'active' ? 'badge-active' : 'badge-archived'}">
+                    ${cam.status}
+                </span>
+            </td>
+            <td>
+                <button class="btn-sm" onclick="toggleArchive('${cam.camera_id}', this)">
+                    ${cam.status === 'active' ? '📦 Arsip' : '♻️ Aktifkan'}
+                </button>
+                <button class="btn-sm btn-danger" onclick="deleteCamera('${cam.camera_id}')">
+                    🗑️ Hapus
+                </button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+// ==========================================
+// 5. DELETE KAMERA
+// ==========================================
+async function deleteCamera(cameraId) {
+    if (!confirm(`Yakin hapus permanen kamera ${cameraId}? Data deteksinya tetap tersimpan.`)) return;
+    try {
+        await fetch(`${API_BASE}/cameras/${cameraId}`, { method: 'DELETE' });
+        alert(`Kamera ${cameraId} dihapus.`);
+        await discoverCameras();
+    } catch (err) {
+        alert('Gagal menghapus kamera.');
+    }
+}
+
+// ==========================================
+// 6. ANALYTICS & FILTERING
+// ==========================================
+async function updateAnalytics() {
+    try {
+        const today = getTodayWIB();
+
+        // Ambil semua deteksi & summary sekaligus
+        const [detectRes, summaryRes] = await Promise.all([
+            fetch(`${API_BASE}/detections/`),
+            fetch(`${API_BASE}/detections/summary?date=${today}`)
+        ]);
+
+        const allData   = await detectRes.json();
+        const summary   = await summaryRes.json(); // {car:45, motorcycle:120, ...}
+
+        const todayData = allData.filter(item => {
+            const itemDate = item.timestamp.replace('T', ' ').split(' ')[0];
+            return itemDate === today && activeCameraIds.includes(item.camera_id);
+        });
+
+        document.getElementById('total-count').textContent = todayData.length;
+        updateDensityStatus(todayData.length);
+        renderTrafficChart(todayData);
+        renderClassChart(summary);   // BARU
+        renderReportsTable(allData); // BARU
+
+    } catch (error) {
+        console.error("Data Fetch Error:", error);
+    }
+}
+
+// ==========================================
+// 7. CHART TREND HARIAN
+// ==========================================
+function renderTrafficChart(data) {
+    const ctx = document.getElementById('trafficTrendChart')?.getContext('2d');
+    if (!ctx) return;
+
+    const hourlyCounts = new Array(24).fill(0);
+    data.forEach(item => {
+        const raw = item.timestamp;
+        let hour;
+        if (raw.includes('+') || raw.endsWith('Z')) {
+            const d = new Date(raw);
+            const wib = new Date(d.getTime() + (7 * 60 + d.getTimezoneOffset()) * 60000);
+            hour = wib.getHours();
+        } else {
+            hour = parseInt((raw.split('T')[1] ?? raw.split(' ')[1] ?? '0').split(':')[0], 10);
+        }
+        if (!isNaN(hour)) hourlyCounts[hour]++;
+    });
+
+    if (trendChart) trendChart.destroy();
+    trendChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2,'0')}:00`),
+            datasets: [{
+                label: 'Kendaraan (Hari Ini - WIB)',
+                data: hourlyCounts,
+                borderColor: '#58a6ff',
+                backgroundColor: 'rgba(88,166,255,0.1)',
+                fill: true,
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: { y: { beginAtZero: true, ticks: { color: '#8b949e' } },
+                      x: { ticks: { color: '#8b949e' } } },
+            plugins: { legend: { labels: { color: '#c9d1d9' } } }
+        }
+    });
+}
+
+// ==========================================
+// 8. CHART KLASIFIKASI KENDARAAN (BARU)
+// ==========================================
+function renderClassChart(summary) {
+    const ctx = document.getElementById('classificationChart')?.getContext('2d');
+    if (!ctx) return;
+
+    const labels = Object.keys(summary);
+    const values = Object.values(summary);
+    const colors = {
+        car:        '#58a6ff',
+        motorcycle: '#3fb950',
+        bus:        '#fbbf24',
+        truck:      '#f85149',
+    };
+    const bgColors = labels.map(l => colors[l] ?? '#8b949e');
+
+    if (classChart) classChart.destroy();
+    classChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: labels.map(l => l.charAt(0).toUpperCase() + l.slice(1)),
+            datasets: [{
+                data: values,
+                backgroundColor: bgColors,
+                borderColor: '#161b22',
+                borderWidth: 3
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'bottom', labels: { color: '#c9d1d9', padding: 16 } }
+            }
+        }
+    });
+}
+
+// ==========================================
+// 9. TABEL REPORTS (BARU)
+// ==========================================
+function renderReportsTable(data) {
+    const tbody = document.getElementById('reports-body');
+    if (!tbody) return;
+
+    // Tampilkan 100 record terbaru
+    const latest = data.slice(-100).reverse();
+    tbody.innerHTML = latest.map(d => `
+        <tr>
+            <td>${new Date(d.timestamp).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}</td>
+            <td>${d.camera_id}</td>
+            <td><span class="badge-type">${d.vehicle_type}</span></td>
+            <td>${d.direction}</td>
+            <td>${d.count}</td>
+        </tr>
+    `).join('');
+}
+
+// ==========================================
+// 10. EXPORT CSV (BARU)
+// ==========================================
+async function exportCSV() {
+    try {
+        const res = await fetch(`${API_BASE}/detections/`);
+        const data = await res.json();
+
+        const headers = ['detection_id','camera_id','timestamp','vehicle_type','direction','count','confidence'];
+        const rows = data.map(d =>
+            headers.map(h => JSON.stringify(d[h] ?? '')).join(',')
+        );
+
+        const csv = [headers.join(','), ...rows].join('\n');
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url  = URL.createObjectURL(blob);
+
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `STMS_Report_${getTodayWIB()}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+    } catch (err) {
+        alert('Gagal export CSV.');
+    }
+}
+
+// ==========================================
+// UTILITIES
+// ==========================================
+function showPage(pageId) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById(`page-${pageId}`).classList.add('active');
+    document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+    event.currentTarget.classList.add('active');
+}
+
+function updateDensityStatus(count) {
+    const statusEl = document.getElementById('density-status');
+    const density = (count / 100) * 100;
+    if (density > 70) {
+        statusEl.textContent = "MACET (High Density)";
+        statusEl.style.color = "#f85149";
+    } else if (density > 40) {
+        statusEl.textContent = "PADAT (Medium)";
+        statusEl.style.color = "#fbbf24";
+    } else {
+        statusEl.textContent = "LANCAR";
+        statusEl.style.color = "#3fb950";
+    }
+}
+
+function updateLine(val) {
+    document.getElementById('line-val').textContent = val;
+    // Kirim ke backend jika ada endpoint-nya nanti
+}
+
+// JAM DIGITAL WIB
+setInterval(() => {
+    const clockEl = document.getElementById('clock');
+    if (!clockEl) return;
+    clockEl.textContent = new Date().toLocaleTimeString('id-ID', {
+        timeZone: 'Asia/Jakarta',
+        hour: '2-digit', minute: '2-digit', second: '2-digit'
+    });
+}, 1000);
+
+// ==========================================
+// INITIALIZATION
+// ==========================================
+async function init() {
+    await discoverCameras();
+    await updateAnalytics();
+}
+
+init();
+setInterval(updateAnalytics, 5000);
+setInterval(discoverCameras, 30000);
