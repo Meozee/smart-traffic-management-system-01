@@ -1,4 +1,3 @@
-version: '3.8'
 services:
   db:
     image: postgres:15
@@ -8,23 +7,22 @@ services:
       POSTGRES_USER: miko_user
       POSTGRES_PASSWORD: miko123
       POSTGRES_DB: stms_db
-      TZ: Asia/Jakarta          # ← Tambahan
-      PGTZ: Asia/Jakarta        # ← Tambahan (khusus PostgreSQL)
+      TZ: Asia/Jakarta
+      PGTZ: Asia/Jakarta
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-
   backend:
-    build: .
+    build: ./layer2_backend
     container_name: stms_01_backend
     restart: always
     environment:
-      TZ: Asia/Jakarta          # ← Backend juga pakai WIB
+      TZ: Asia/Jakarta
+      DATABASE_URL: postgresql://miko_user:miko123@db:5432/stms_db
     depends_on:
       - db
     ports:
       - "8000:8000"
-
 volumes:
   postgres_data:

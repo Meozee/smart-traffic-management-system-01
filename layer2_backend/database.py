@@ -1,8 +1,9 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from .models import Base, UserAccount # Pastikan UserAccount sudah di-import
+import os
 
-DATABASE_URL = "postgresql://miko_user:miko123@localhost:5432/stms_db"
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://miko_user:miko123@localhost:5432/stms_db")
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

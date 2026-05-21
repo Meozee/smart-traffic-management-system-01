@@ -16,7 +16,7 @@ async function loadPage(pageName) {
     
     // Update tombol aktif di Sidebar
     document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
-    event.currentTarget?.classList.add('active');
+    if (event && event.currentTarget) event.currentTarget.classList.add('active');
 
     try {
         // Ambil struktur HTML dari folder pages

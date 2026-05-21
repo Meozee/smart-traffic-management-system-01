@@ -20,9 +20,9 @@ async function initCamerasPage() {
                 </div>
                 
                 <div class="stream-container">
-                    <img src="${API_BASE}/stream/${cam.camera_id}" 
-                         alt="Stream ${cam.camera_id}"
-                         onerror="this.parentElement.innerHTML='<div class=\'stream-error\'>⚠️ Koneksi Terputus</div>'">
+                    <video src="http://localhost:3000/output_result.mp4" 
+				autoplay loop muted style="width:100%">
+		    </video>
                 </div>
 
                 <div class="cam-controls">

@@ -1,0 +1,1818 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>STMS — Smart Traffic Monitoring System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg:         #0d0f12;
+    --surface:    #13161b;
+    --surface2:   #1a1e25;
+    --surface3:   #21262f;
+    --border:     rgba(255,255,255,0.07);
+    --border2:    rgba(255,255,255,0.12);
+    --text:       #e8eaf0;
+    --text2:      #8a8f9e;
+    --text3:      #555b6a;
+    --accent:     #4f8ef7;
+    --accent-dim: rgba(79,142,247,0.12);
+    --green:      #34d399;
+    --green-dim:  rgba(52,211,153,0.12);
+    --yellow:     #fbbf24;
+    --yellow-dim: rgba(251,191,36,0.12);
+    --red:        #f87171;
+    --red-dim:    rgba(248,113,113,0.12);
+    --radius:     10px;
+    --radius-lg:  16px;
+    --font:       'DM Sans', sans-serif;
+    --mono:       'DM Mono', monospace;
+    --sidebar-w:  220px;
+    --nav-h:      60px;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  /* ── TOP NAV ──────────────────────────────────── */
+  .topnav {
+    height: var(--nav-h);
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 24px;
+    gap: 16px;
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 100;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 600;
+    font-size: 15px;
+    letter-spacing: -0.3px;
+    color: var(--text);
+    text-decoration: none;
+    flex-shrink: 0;
+  }
+
+  .logo-icon {
+    width: 30px; height: 30px;
+    background: var(--accent);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+  }
+
+  .logo-sub {
+    font-size: 11px;
+    color: var(--text3);
+    font-weight: 400;
+    letter-spacing: 0;
+  }
+
+  .nav-divider {
+    width: 1px;
+    height: 24px;
+    background: var(--border);
+    margin: 0 4px;
+  }
+
+  .topnav-links {
+    display: flex;
+    gap: 2px;
+    flex: 1;
+  }
+
+  .nav-link {
+    padding: 6px 14px;
+    border-radius: 7px;
+    font-size: 13.5px;
+    font-weight: 500;
+    color: var(--text2);
+    cursor: pointer;
+    transition: all .15s;
+    border: none;
+    background: transparent;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+
+  .nav-link:hover { color: var(--text); background: var(--surface2); }
+  .nav-link.active { color: var(--accent); background: var(--accent-dim); }
+
+  .nav-link .icon { font-size: 15px; }
+
+  .topnav-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-left: auto;
+  }
+
+  .status-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text2);
+    font-family: var(--mono);
+  }
+
+  .dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 6px var(--green);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%,100% { opacity:1; }
+    50% { opacity:.4; }
+  }
+
+  .clock {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--text2);
+    background: var(--surface2);
+    padding: 5px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+  }
+
+  /* ── LAYOUT ───────────────────────────────────── */
+  .body-wrap {
+    display: flex;
+    margin-top: var(--nav-h);
+    flex: 1;
+  }
+
+  /* ── SIDEBAR ──────────────────────────────────── */
+  .sidebar {
+    width: var(--sidebar-w);
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 20px 12px;
+    position: fixed;
+    top: var(--nav-h);
+    bottom: 0;
+    left: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .sidebar-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text3);
+    padding: 8px 8px 4px;
+    font-weight: 500;
+  }
+
+  .location-item {
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 2px;
+  }
+
+  .location-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 10px;
+    cursor: pointer;
+    transition: background .15s;
+    border-radius: 8px;
+  }
+
+  .location-header:hover { background: var(--surface2); }
+
+  .location-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .location-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    flex: 1;
+  }
+
+  .cam-list {
+    padding: 2px 0 4px 26px;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+
+  .cam-item {
+    font-size: 12px;
+    color: var(--text3);
+    padding: 4px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all .15s;
+    font-family: var(--mono);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .cam-item:hover { color: var(--text2); background: var(--surface2); }
+
+  .cam-status-dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  /* ── MAIN CONTENT ─────────────────────────────── */
+  .main {
+    margin-left: var(--sidebar-w);
+    flex: 1;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    min-height: calc(100vh - var(--nav-h));
+  }
+
+  .page { display: none; flex-direction: column; gap: 20px; }
+  .page.active { display: flex; }
+
+  /* ── PAGE HEADER ──────────────────────────────── */
+  .page-header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .page-title {
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: -0.4px;
+    color: var(--text);
+  }
+
+  .page-subtitle {
+    font-size: 13px;
+    color: var(--text2);
+    margin-top: 2px;
+  }
+
+  .page-actions { display: flex; gap: 8px; align-items: center; }
+
+  /* ── CARDS ────────────────────────────────────── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+  }
+
+  .card-title {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: .8px;
+    color: var(--text3);
+    font-weight: 500;
+    margin-bottom: 14px;
+  }
+
+  /* ── STAT CARDS ───────────────────────────────── */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+  }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 18px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    transition: border-color .2s;
+  }
+
+  .stat-card:hover { border-color: var(--border2); }
+
+  .stat-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .stat-label {
+    font-size: 12px;
+    color: var(--text2);
+    font-weight: 500;
+  }
+
+  .stat-icon {
+    width: 30px; height: 30px;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+  }
+
+  .stat-value {
+    font-size: 28px;
+    font-weight: 600;
+    letter-spacing: -1px;
+    line-height: 1;
+    font-family: var(--mono);
+  }
+
+  .stat-meta {
+    font-size: 11.5px;
+    color: var(--text3);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  /* ── GRID LAYOUTS ─────────────────────────────── */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .grid-3 { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; }
+
+  /* ── CHART AREA ───────────────────────────────── */
+  .chart-wrap {
+    position: relative;
+    height: 220px;
+  }
+
+  /* ── CAMERA FEED GRID ─────────────────────────── */
+  .feed-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+
+  .feed-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    transition: border-color .2s;
+  }
+
+  .feed-card:hover { border-color: var(--border2); }
+
+  .feed-header {
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .feed-cam-id {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text);
+  }
+
+  .feed-loc {
+    font-size: 11.5px;
+    color: var(--text3);
+    margin-top: 1px;
+  }
+
+  .feed-screen {
+    background: #080a0d;
+    aspect-ratio: 16/9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .feed-overlay {
+    position: absolute;
+    inset: 0;
+    background: 
+      linear-gradient(to bottom, rgba(0,0,0,0.4) 0%, transparent 30%, transparent 70%, rgba(0,0,0,0.5) 100%);
+  }
+
+  .feed-scan {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(to right, transparent, var(--accent), transparent);
+    animation: scan 3s ease-in-out infinite;
+    opacity: 0.6;
+  }
+
+  @keyframes scan {
+    0% { top: 0%; }
+    100% { top: 100%; }
+  }
+
+  .feed-label {
+    position: absolute;
+    top: 8px; left: 8px;
+    font-size: 10px;
+    font-family: var(--mono);
+    color: var(--accent);
+    background: rgba(79,142,247,0.15);
+    padding: 3px 7px;
+    border-radius: 4px;
+    border: 1px solid rgba(79,142,247,0.3);
+    letter-spacing: .5px;
+  }
+
+  .feed-placeholder-icon {
+    font-size: 28px;
+    opacity: 0.15;
+    position: relative;
+    z-index: 1;
+  }
+
+  .feed-footer {
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .feed-count {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text2);
+  }
+
+  .feed-count span {
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  /* ── STATUS TABLE ─────────────────────────────── */
+  .stbl {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .stbl th {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .7px;
+    color: var(--text3);
+    font-weight: 500;
+    padding: 0 10px 10px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .stbl td {
+    padding: 11px 10px;
+    font-size: 13px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text2);
+  }
+
+  .stbl tr:last-child td { border-bottom: none; }
+  .stbl tr:hover td { background: var(--surface2); }
+
+  .stbl .cam-id {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  /* ── BADGES ───────────────────────────────────── */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 9px;
+    border-radius: 20px;
+    font-size: 11.5px;
+    font-weight: 500;
+    font-family: var(--mono);
+  }
+
+  .badge-dot { width: 5px; height: 5px; border-radius: 50%; }
+
+  .badge-low    { background: var(--green-dim);  color: var(--green);  }
+  .badge-mid    { background: var(--yellow-dim); color: var(--yellow); }
+  .badge-high   { background: var(--red-dim);    color: var(--red);    }
+  .badge-active { background: var(--green-dim);  color: var(--green);  }
+
+  /* ── ALERTS ───────────────────────────────────── */
+  .alert-item {
+    padding: 14px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    margin-bottom: 10px;
+    transition: border-color .2s;
+  }
+
+  .alert-item:last-child { margin-bottom: 0; }
+  .alert-item:hover { border-color: var(--border2); }
+
+  .alert-item.high { border-left: 3px solid var(--red); }
+  .alert-item.mid  { border-left: 3px solid var(--yellow); }
+
+  .alert-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+
+  .alert-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .alert-meta {
+    font-size: 12px;
+    color: var(--text3);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-bottom: 10px;
+  }
+
+  .alert-meta span { display: flex; align-items: center; gap: 5px; }
+
+  .alert-actions { display: flex; gap: 8px; }
+
+  /* ── BUTTONS ──────────────────────────────────── */
+  .btn {
+    padding: 6px 14px;
+    border-radius: 7px;
+    font-size: 12.5px;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    transition: all .15s;
+    font-family: var(--font);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+  }
+
+  .btn-primary:hover { background: #6b9ef8; }
+
+  .btn-ghost {
+    background: var(--surface3);
+    color: var(--text2);
+    border: 1px solid var(--border);
+  }
+
+  .btn-ghost:hover { background: var(--surface2); color: var(--text); }
+
+  .btn-sm { padding: 5px 11px; font-size: 12px; }
+
+  /* ── REPORTS PAGE ─────────────────────────────── */
+  .filter-bar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+
+  .filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .filter-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .7px;
+    color: var(--text3);
+    font-weight: 500;
+  }
+
+  .filter-input {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 7px 12px;
+    color: var(--text);
+    font-size: 13px;
+    font-family: var(--font);
+    outline: none;
+    transition: border-color .15s;
+    min-width: 140px;
+  }
+
+  .filter-input:focus { border-color: var(--accent); }
+
+  option { background: var(--surface2); }
+
+  .summary-strip {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+  }
+
+  .summary-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+  }
+
+  .summary-value {
+    font-size: 22px;
+    font-weight: 600;
+    font-family: var(--mono);
+    color: var(--text);
+    letter-spacing: -0.5px;
+  }
+
+  .summary-label {
+    font-size: 12px;
+    color: var(--text3);
+    margin-top: 3px;
+  }
+
+  /* ── CAMERAS DETAIL PAGE ──────────────────────── */
+  .cam-detail-grid {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    gap: 14px;
+  }
+
+  .large-feed {
+    background: #050709;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    aspect-ratio: 16/10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .large-feed .feed-scan { animation-duration: 4s; }
+
+  .detection-box {
+    position: absolute;
+    border: 1.5px solid var(--accent);
+    border-radius: 4px;
+    font-size: 9px;
+    font-family: var(--mono);
+    color: var(--accent);
+    animation: flicker 2s ease-in-out infinite;
+  }
+
+  @keyframes flicker {
+    0%,100% { opacity:1; }
+    50% { opacity:.6; }
+  }
+
+  .detection-box .box-label {
+    position: absolute;
+    top: -18px; left: -1px;
+    background: var(--accent);
+    color: #fff;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 9px;
+    white-space: nowrap;
+  }
+
+  .flow-bar {
+    background: var(--surface2);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 10px;
+  }
+
+  .flow-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  .flow-label { font-size: 13px; color: var(--text2); }
+
+  .flow-val {
+    font-family: var(--mono);
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .flow-track {
+    height: 4px;
+    background: var(--surface3);
+    border-radius: 99px;
+    margin-top: 6px;
+    overflow: hidden;
+  }
+
+  .flow-fill {
+    height: 100%;
+    border-radius: 99px;
+    transition: width .6s ease;
+  }
+
+  /* ── SETTINGS PAGE ────────────────────────────── */
+  .settings-section {
+    margin-bottom: 6px;
+  }
+
+  .settings-section-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .8px;
+    color: var(--text3);
+    font-weight: 500;
+    margin-bottom: 12px;
+  }
+
+  .settings-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    margin-bottom: 14px;
+  }
+
+  .settings-field label {
+    display: block;
+    font-size: 12px;
+    color: var(--text2);
+    margin-bottom: 6px;
+    font-weight: 500;
+  }
+
+  .settings-field input,
+  .settings-field select {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 8px 12px;
+    color: var(--text);
+    font-size: 13px;
+    font-family: var(--font);
+    outline: none;
+    transition: border-color .15s;
+  }
+
+  .settings-field input:focus,
+  .settings-field select:focus { border-color: var(--accent); }
+
+  .cam-table-wrap {
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  /* ── PROGRESS BAR ─────────────────────────────── */
+  .density-bar-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .density-track {
+    flex: 1;
+    height: 4px;
+    background: var(--surface3);
+    border-radius: 99px;
+    overflow: hidden;
+  }
+
+  .density-fill { height: 100%; border-radius: 99px; }
+
+  /* ── SCROLLBAR ────────────────────────────────── */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 99px; }
+
+  /* ── FADE IN ──────────────────────────────────── */
+  .fade-in {
+    animation: fadeIn .25s ease;
+  }
+
+  @keyframes fadeIn {
+    from { opacity:0; transform: translateY(4px); }
+    to   { opacity:1; transform: translateY(0); }
+  }
+
+  /* ── DIVIDER ──────────────────────────────────── */
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 6px 0;
+  }
+</style>
+</head>
+<body>
+
+<!-- ── TOP NAV ────────────────────────────────────── -->
+<nav class="topnav">
+  <div class="logo">
+    <div class="logo-icon">🚦</div>
+    <div>
+      <div>STMS</div>
+      <div class="logo-sub">Central Aceh Regency</div>
+    </div>
+  </div>
+
+  <div class="nav-divider"></div>
+
+  <div class="topnav-links">
+    <button class="nav-link active" data-page="dashboard" onclick="switchPage('dashboard',this)">
+      <span class="icon">◈</span> Dashboard
+    </button>
+    <button class="nav-link" data-page="reports" onclick="switchPage('reports',this)">
+      <span class="icon">◎</span> Reports
+    </button>
+    <button class="nav-link" data-page="cameras" onclick="switchPage('cameras',this)">
+      <span class="icon">⊡</span> Cameras
+    </button>
+    <button class="nav-link" data-page="settings" onclick="switchPage('settings',this)">
+      <span class="icon">◧</span> Settings
+    </button>
+  </div>
+
+  <div class="topnav-right">
+    <div class="status-pill">
+      <div class="dot"></div>
+      <span>System Online</span>
+    </div>
+    <div class="clock" id="clock">--:--:--</div>
+  </div>
+</nav>
+
+<!-- ── BODY ───────────────────────────────────────── -->
+<div class="body-wrap">
+
+  <!-- ── SIDEBAR ──────────────────────────────────── -->
+  <aside class="sidebar">
+    <div class="sidebar-label">Locations</div>
+
+    <div class="location-item">
+      <div class="location-header">
+        <div class="location-dot" style="background:var(--green);box-shadow:0 0 5px var(--green)"></div>
+        <div class="location-name">Lake Laut Tawar</div>
+      </div>
+      <div class="cam-list">
+        <div class="cam-item"><div class="cam-status-dot" style="background:var(--green)"></div>CAM-01 · Inbound</div>
+        <div class="cam-item"><div class="cam-status-dot" style="background:var(--yellow)"></div>CAM-02 · Outbound</div>
+      </div>
+    </div>
+
+    <div class="location-item">
+      <div class="location-header">
+        <div class="location-dot" style="background:var(--red);box-shadow:0 0 5px var(--red)"></div>
+        <div class="location-name">Pantan Terong</div>
+      </div>
+      <div class="cam-list">
+        <div class="cam-item"><div class="cam-status-dot" style="background:var(--red)"></div>CAM-03 · Main Road</div>
+      </div>
+    </div>
+
+    <div class="location-item">
+      <div class="location-header">
+        <div class="location-dot" style="background:var(--green);box-shadow:0 0 5px var(--green)"></div>
+        <div class="location-name">Takengon City</div>
+      </div>
+      <div class="cam-list">
+        <div class="cam-item"><div class="cam-status-dot" style="background:var(--green)"></div>CAM-04 · City Center</div>
+      </div>
+    </div>
+
+    <div class="divider" style="margin-top:auto"></div>
+    <div class="sidebar-label">Refresh rate · 5s</div>
+    <div class="sidebar-label" id="lastUpdate">Updated --:--</div>
+  </aside>
+
+  <!-- ── MAIN ─────────────────────────────────────── -->
+  <main class="main">
+
+    <!-- ══ PAGE: DASHBOARD ═══════════════════════════ -->
+    <div class="page active" id="page-dashboard">
+
+      <div class="page-header fade-in">
+        <div>
+          <div class="page-title">Overview</div>
+          <div class="page-subtitle">Real-time traffic monitoring · Department of Transportation</div>
+        </div>
+        <div class="page-actions">
+          <button class="btn btn-ghost btn-sm">↓ Export</button>
+          <button class="btn btn-primary btn-sm">⊕ Add Camera</button>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="stats-row fade-in">
+        <div class="stat-card">
+          <div class="stat-top">
+            <span class="stat-label">Active Cameras</span>
+            <div class="stat-icon" style="background:var(--accent-dim)">📷</div>
+          </div>
+          <div class="stat-value" style="color:var(--accent)">4</div>
+          <div class="stat-meta"><span class="dot"></span> All online</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-top">
+            <span class="stat-label">Vehicles / 15 min</span>
+            <div class="stat-icon" style="background:var(--green-dim)">🚗</div>
+          </div>
+          <div class="stat-value" style="color:var(--green)" id="vehicleCount">103</div>
+          <div class="stat-meta">↑ +12 from last interval</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-top">
+            <span class="stat-label">Active Alerts</span>
+            <div class="stat-icon" style="background:var(--red-dim)">🔔</div>
+          </div>
+          <div class="stat-value" style="color:var(--red)">2</div>
+          <div class="stat-meta">1 high · 1 medium</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-top">
+            <span class="stat-label">System Uptime</span>
+            <div class="stat-icon" style="background:var(--green-dim)">⬡</div>
+          </div>
+          <div class="stat-value" style="color:var(--green)">98%</div>
+          <div class="stat-meta">Since 08:00 today</div>
+        </div>
+      </div>
+
+      <!-- Chart + Status -->
+      <div class="grid-3 fade-in">
+        <div class="card">
+          <div class="card-title">Traffic Density Trend — Last 6 Hours</div>
+          <div class="chart-wrap">
+            <canvas id="densityChart"></canvas>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Current Status</div>
+          <table class="stbl">
+            <thead>
+              <tr>
+                <th>Camera</th>
+                <th>Density</th>
+                <th>Vehicles</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="cam-id">CAM-01</td>
+                <td><span class="badge badge-low"><span class="badge-dot" style="background:var(--green)"></span>Low</span></td>
+                <td><span style="font-family:var(--mono)">12</span></td>
+              </tr>
+              <tr>
+                <td class="cam-id">CAM-02</td>
+                <td><span class="badge badge-mid"><span class="badge-dot" style="background:var(--yellow)"></span>Medium</span></td>
+                <td><span style="font-family:var(--mono)">28</span></td>
+              </tr>
+              <tr>
+                <td class="cam-id">CAM-03</td>
+                <td><span class="badge badge-high"><span class="badge-dot" style="background:var(--red)"></span>High</span></td>
+                <td><span style="font-family:var(--mono)">45</span></td>
+              </tr>
+              <tr>
+                <td class="cam-id">CAM-04</td>
+                <td><span class="badge badge-low"><span class="badge-dot" style="background:var(--green)"></span>Low</span></td>
+                <td><span style="font-family:var(--mono)">18</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Camera Feeds + Alerts -->
+      <div class="grid-2 fade-in">
+        <div class="card">
+          <div class="card-title">Live Camera Feeds · YOLOv8 Active</div>
+          <div class="feed-grid">
+            <!-- CAM-01 -->
+            <div class="feed-card">
+              <div class="feed-header">
+                <div>
+                  <div class="feed-cam-id">CAM-01</div>
+                  <div class="feed-loc">Lake Laut Tawar · Inbound</div>
+                </div>
+                <span class="badge badge-low"><span class="badge-dot" style="background:var(--green)"></span>Low</span>
+              </div>
+              <div class="feed-screen">
+                <div class="feed-overlay"></div>
+                <div class="feed-scan"></div>
+                <div class="feed-label">YOLOv8 · LIVE</div>
+                <div class="feed-placeholder-icon">📷</div>
+              </div>
+              <div class="feed-footer">
+                <div class="feed-count">Vehicles: <span>12</span></div>
+                <div class="feed-count">Car: <span>7</span> · Moto: <span>4</span> · Truck: <span>1</span></div>
+              </div>
+            </div>
+            <!-- CAM-02 -->
+            <div class="feed-card">
+              <div class="feed-header">
+                <div>
+                  <div class="feed-cam-id">CAM-02</div>
+                  <div class="feed-loc">Lake Laut Tawar · Outbound</div>
+                </div>
+                <span class="badge badge-mid"><span class="badge-dot" style="background:var(--yellow)"></span>Medium</span>
+              </div>
+              <div class="feed-screen">
+                <div class="feed-overlay"></div>
+                <div class="feed-scan" style="animation-delay:.8s"></div>
+                <div class="feed-label">YOLOv8 · LIVE</div>
+                <div class="feed-placeholder-icon">📷</div>
+              </div>
+              <div class="feed-footer">
+                <div class="feed-count">Vehicles: <span>28</span></div>
+                <div class="feed-count">Car: <span>18</span> · Moto: <span>9</span> · Bus: <span>1</span></div>
+              </div>
+            </div>
+            <!-- CAM-03 -->
+            <div class="feed-card">
+              <div class="feed-header">
+                <div>
+                  <div class="feed-cam-id">CAM-03</div>
+                  <div class="feed-loc">Pantan Terong · Main Road</div>
+                </div>
+                <span class="badge badge-high"><span class="badge-dot" style="background:var(--red)"></span>High</span>
+              </div>
+              <div class="feed-screen">
+                <div class="feed-overlay"></div>
+                <div class="feed-scan" style="animation-delay:1.5s; background:linear-gradient(to right,transparent,var(--red),transparent)"></div>
+                <div class="feed-label" style="color:var(--red);background:var(--red-dim);border-color:rgba(248,113,113,0.3)">YOLOv8 · LIVE</div>
+                <div class="feed-placeholder-icon">📷</div>
+              </div>
+              <div class="feed-footer">
+                <div class="feed-count">Vehicles: <span>45</span></div>
+                <div class="feed-count">Car: <span>30</span> · Moto: <span>12</span> · Truck: <span>3</span></div>
+              </div>
+            </div>
+            <!-- CAM-04 -->
+            <div class="feed-card">
+              <div class="feed-header">
+                <div>
+                  <div class="feed-cam-id">CAM-04</div>
+                  <div class="feed-loc">Takengon City Center</div>
+                </div>
+                <span class="badge badge-low"><span class="badge-dot" style="background:var(--green)"></span>Low</span>
+              </div>
+              <div class="feed-screen">
+                <div class="feed-overlay"></div>
+                <div class="feed-scan" style="animation-delay:2.2s"></div>
+                <div class="feed-label">YOLOv8 · LIVE</div>
+                <div class="feed-placeholder-icon">📷</div>
+              </div>
+              <div class="feed-footer">
+                <div class="feed-count">Vehicles: <span>18</span></div>
+                <div class="feed-count">Car: <span>12</span> · Moto: <span>5</span> · Bus: <span>1</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Alerts -->
+        <div class="card">
+          <div class="card-title">Active Alerts · 2 unacknowledged</div>
+          <div class="alert-item high">
+            <div class="alert-row">
+              <div class="alert-title">
+                <span style="color:var(--red)">▲</span> High Density Warning
+              </div>
+              <span class="badge badge-high">High</span>
+            </div>
+            <div class="alert-meta">
+              <span>📍 Pantan Terong · CAM-03</span>
+              <span>🕐 14:25 · 15-min window</span>
+              <span>🚗 45 vehicles · capacity 30 · ratio 150%</span>
+            </div>
+            <div class="alert-actions">
+              <button class="btn btn-primary btn-sm" onclick="acknowledgeAlert(this)">✓ Acknowledge</button>
+              <button class="btn btn-ghost btn-sm">Detail</button>
+            </div>
+          </div>
+          <div class="alert-item mid">
+            <div class="alert-row">
+              <div class="alert-title">
+                <span style="color:var(--yellow)">◆</span> Medium Density
+              </div>
+              <span class="badge badge-mid">Medium</span>
+            </div>
+            <div class="alert-meta">
+              <span>📍 Lake Laut Tawar · CAM-02</span>
+              <span>🕐 14:20 · 15-min window</span>
+              <span>🚗 28 vehicles · capacity 40 · ratio 70%</span>
+            </div>
+            <div class="alert-actions">
+              <button class="btn btn-primary btn-sm" onclick="acknowledgeAlert(this)">✓ Acknowledge</button>
+              <button class="btn btn-ghost btn-sm">Detail</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ PAGE: REPORTS ══════════════════════════════ -->
+    <div class="page" id="page-reports">
+      <div class="page-header fade-in">
+        <div>
+          <div class="page-title">Historical Reports</div>
+          <div class="page-subtitle">Traffic analytics and trend data</div>
+        </div>
+        <div class="page-actions">
+          <button class="btn btn-ghost btn-sm">↓ PDF</button>
+          <button class="btn btn-ghost btn-sm">↓ CSV</button>
+          <button class="btn btn-primary btn-sm">⊕ Generate</button>
+        </div>
+      </div>
+
+      <div class="filter-bar fade-in">
+        <div class="filter-group">
+          <span class="filter-label">Start Date</span>
+          <input type="date" class="filter-input" value="2025-03-01">
+        </div>
+        <div class="filter-group">
+          <span class="filter-label">End Date</span>
+          <input type="date" class="filter-input" value="2025-03-07">
+        </div>
+        <div class="filter-group">
+          <span class="filter-label">Location</span>
+          <select class="filter-input">
+            <option>All Locations</option>
+            <option>Lake Laut Tawar</option>
+            <option>Pantan Terong</option>
+            <option>Takengon City</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <span class="filter-label">Vehicle Type</span>
+          <select class="filter-input">
+            <option>All Types</option>
+            <option>Car</option>
+            <option>Motorcycle</option>
+            <option>Truck</option>
+            <option>Bus</option>
+          </select>
+        </div>
+        <div style="margin-left:auto">
+          <button class="btn btn-primary">Generate Report</button>
+        </div>
+      </div>
+
+      <div class="summary-strip fade-in">
+        <div class="summary-card">
+          <div class="summary-value">52,340</div>
+          <div class="summary-label">Total Vehicles Detected</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-value">18</div>
+          <div class="summary-label">High-Density Alerts Triggered</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-value">Sun · 10–11AM</div>
+          <div class="summary-label">Peak Day & Hour</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-value" style="color:var(--yellow)">Medium</div>
+          <div class="summary-label">Average Density Level</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-value">8,920</div>
+          <div class="summary-label">Peak Day Vehicle Count</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-value" style="color:var(--green)">98.4%</div>
+          <div class="summary-label">Average System Uptime</div>
+        </div>
+      </div>
+
+      <div class="card fade-in">
+        <div class="card-title">Daily Traffic Breakdown</div>
+        <div class="chart-wrap" style="height:180px;margin-bottom:20px">
+          <canvas id="reportChart"></canvas>
+        </div>
+        <table class="stbl">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Total Vehicles</th>
+              <th>Avg Density</th>
+              <th>Alerts</th>
+              <th>Peak Hour</th>
+              <th>Density %</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="font-family:var(--mono);font-size:12px">Mar 1, 2025</td>
+              <td style="font-family:var(--mono)">6,850</td>
+              <td><span class="badge badge-low"><span class="badge-dot" style="background:var(--green)"></span>Low</span></td>
+              <td style="font-family:var(--mono)">2</td>
+              <td style="font-family:var(--mono)">09:00</td>
+              <td>
+                <div class="density-bar-wrap">
+                  <div class="density-track"><div class="density-fill" style="width:28%;background:var(--green)"></div></div>
+                  <span style="font-family:var(--mono);font-size:11px;color:var(--text3)">28%</span>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td style="font-family:var(--mono);font-size:12px">Mar 2, 2025 <span style="color:var(--text3);font-size:11px">·wknd</span></td>
+              <td style="font-family:var(--mono)">8,420</td>
+              <td><span class="badge badge-mid"><span class="badge-dot" style="background:var(--yellow)"></span>Medium</span></td>
+              <td style="font-family:var(--mono)">5</td>
+              <td style="font-family:var(--mono)">10:30</td>
+              <td>
+                <div class="density-bar-wrap">
+                  <div class="density-track"><div class="density-fill" style="width:55%;background:var(--yellow)"></div></div>
+                  <span style="font-family:var(--mono);font-size:11px;color:var(--text3)">55%</span>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td style="font-family:var(--mono);font-size:12px">Mar 3, 2025 <span style="color:var(--text3);font-size:11px">·wknd</span></td>
+              <td style="font-family:var(--mono)">8,920</td>
+              <td><span class="badge badge-high"><span class="badge-dot" style="background:var(--red)"></span>High</span></td>
+              <td style="font-family:var(--mono)">8</td>
+              <td style="font-family:var(--mono)">10:00</td>
+              <td>
+                <div class="density-bar-wrap">
+                  <div class="density-track"><div class="density-fill" style="width:82%;background:var(--red)"></div></div>
+                  <span style="font-family:var(--mono);font-size:11px;color:var(--text3)">82%</span>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td style="font-family:var(--mono);font-size:12px">Mar 4, 2025</td>
+              <td style="font-family:var(--mono)">7,100</td>
+              <td><span class="badge badge-low"><span class="badge-dot" style="background:var(--green)"></span>Low</span></td>
+              <td style="font-family:var(--mono)">1</td>
+              <td style="font-family:var(--mono)">08:30</td>
+              <td>
+                <div class="density-bar-wrap">
+                  <div class="density-track"><div class="density-fill" style="width:32%;background:var(--green)"></div></div>
+                  <span style="font-family:var(--mono);font-size:11px;color:var(--text3)">32%</span>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ══ PAGE: CAMERAS ═══════════════════════════════ -->
+    <div class="page" id="page-cameras">
+      <div class="page-header fade-in">
+        <div>
+          <div class="page-title">Camera Detail</div>
+          <div class="page-subtitle">CAM-03 · Pantan Terong Main Road</div>
+        </div>
+        <div class="page-actions">
+          <select class="filter-input" style="min-width:180px">
+            <option>CAM-03 · Pantan Terong</option>
+            <option>CAM-01 · Lake Laut Tawar (In)</option>
+            <option>CAM-02 · Lake Laut Tawar (Out)</option>
+            <option>CAM-04 · Takengon City</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="cam-detail-grid fade-in">
+        <!-- Left: Feed -->
+        <div>
+          <div class="large-feed">
+            <div class="feed-overlay"></div>
+            <div class="feed-scan" style="animation-duration:4s;background:linear-gradient(to right,transparent,var(--red),transparent)"></div>
+            <div class="feed-label" style="position:absolute;top:12px;left:12px;font-size:10px;font-family:var(--mono);color:var(--red);background:var(--red-dim);padding:3px 8px;border-radius:4px;border:1px solid rgba(248,113,113,.3)">
+              YOLOv8 · LIVE · 28FPS
+            </div>
+            <div style="position:absolute;top:12px;right:12px;font-family:var(--mono);font-size:10px;color:var(--text3)">1920×1080</div>
+
+            <!-- Simulated bounding boxes -->
+            <div class="detection-box" style="left:20%;top:30%;width:12%;height:22%">
+              <div class="box-label">Car 0.94</div>
+            </div>
+            <div class="detection-box" style="left:45%;top:25%;width:10%;height:20%;animation-delay:.4s">
+              <div class="box-label">Car 0.89</div>
+            </div>
+            <div class="detection-box" style="left:65%;top:35%;width:7%;height:15%;animation-delay:.8s;border-color:var(--yellow);color:var(--yellow)">
+              <div class="box-label" style="background:var(--yellow);color:#000">Moto 0.82</div>
+            </div>
+            <div class="detection-box" style="left:30%;top:55%;width:14%;height:24%;animation-delay:1.2s;border-color:var(--red);color:var(--red)">
+              <div class="box-label" style="background:var(--red)">Truck 0.91</div>
+            </div>
+
+            <div style="position:absolute;bottom:12px;left:12px;right:12px;display:flex;gap:10px">
+              <div style="flex:1;background:rgba(0,0,0,.5);border-radius:6px;padding:8px 12px;font-family:var(--mono);font-size:11px;color:var(--text2)">
+                <span style="color:var(--text)">8</span> detected · conf ≥ 0.50
+              </div>
+              <div style="background:rgba(0,0,0,.5);border-radius:6px;padding:8px 12px;font-family:var(--mono);font-size:11px;color:var(--red)">
+                ● DENSITY: HIGH
+              </div>
+            </div>
+          </div>
+
+          <!-- Detection breakdown -->
+          <div class="card" style="margin-top:14px">
+            <div class="card-title">Detection Breakdown · Current Frame</div>
+            <table class="stbl">
+              <thead>
+                <tr><th>Type</th><th>Count</th><th>Confidence</th><th>Share</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>🚗 Car</td>
+                  <td style="font-family:var(--mono)">5</td>
+                  <td style="font-family:var(--mono);color:var(--green)">0.94 avg</td>
+                  <td>
+                    <div class="density-bar-wrap">
+                      <div class="density-track"><div class="density-fill" style="width:62.5%;background:var(--accent)"></div></div>
+                      <span style="font-family:var(--mono);font-size:11px;color:var(--text3)">62.5%</span>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>🏍️ Motorcycle</td>
+                  <td style="font-family:var(--mono)">2</td>
+                  <td style="font-family:var(--mono);color:var(--green)">0.82 avg</td>
+                  <td>
+                    <div class="density-bar-wrap">
+                      <div class="density-track"><div class="density-fill" style="width:25%;background:var(--yellow)"></div></div>
+                      <span style="font-family:var(--mono);font-size:11px;color:var(--text3)">25%</span>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>🚚 Truck</td>
+                  <td style="font-family:var(--mono)">1</td>
+                  <td style="font-family:var(--mono);color:var(--yellow)">0.91 avg</td>
+                  <td>
+                    <div class="density-bar-wrap">
+                      <div class="density-track"><div class="density-fill" style="width:12.5%;background:var(--red)"></div></div>
+                      <span style="font-family:var(--mono);font-size:11px;color:var(--text3)">12.5%</span>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Right: Stats -->
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <!-- Inflow / Outflow -->
+          <div class="card">
+            <div class="card-title">Inflow vs Outflow · UC-06</div>
+            <div class="flow-bar">
+              <div class="flow-row">
+                <span class="flow-label">▲ Inbound</span>
+                <span class="flow-val" style="color:var(--green)">28</span>
+              </div>
+              <div class="flow-track">
+                <div class="flow-fill" style="width:70%;background:var(--green)"></div>
+              </div>
+            </div>
+            <div class="flow-bar">
+              <div class="flow-row">
+                <span class="flow-label">▼ Outbound</span>
+                <span class="flow-val" style="color:var(--accent)">17</span>
+              </div>
+              <div class="flow-track">
+                <div class="flow-fill" style="width:42.5%;background:var(--accent)"></div>
+              </div>
+            </div>
+            <div style="background:var(--red-dim);border:1px solid rgba(248,113,113,.2);border-radius:8px;padding:12px 14px;margin-top:4px;display:flex;justify-content:space-between;align-items:center">
+              <span style="font-size:13px;color:var(--text2)">Net Flow</span>
+              <span style="font-family:var(--mono);font-size:16px;font-weight:600;color:var(--red)">+11 buildup</span>
+            </div>
+          </div>
+
+          <!-- 24h Stats -->
+          <div class="card">
+            <div class="card-title">Camera Stats · 24h</div>
+            <table class="stbl">
+              <tbody>
+                <tr>
+                  <td style="color:var(--text3)">Total Vehicles</td>
+                  <td style="font-family:var(--mono);text-align:right">1,245</td>
+                </tr>
+                <tr>
+                  <td style="color:var(--text3)">Peak Hour</td>
+                  <td style="font-family:var(--mono);text-align:right">10:00–11:00</td>
+                </tr>
+                <tr>
+                  <td style="color:var(--text3)">High Alerts</td>
+                  <td style="font-family:var(--mono);text-align:right;color:var(--red)">3</td>
+                </tr>
+                <tr>
+                  <td style="color:var(--text3)">Uptime</td>
+                  <td style="font-family:var(--mono);text-align:right;color:var(--green)">99.2%</td>
+                </tr>
+                <tr>
+                  <td style="color:var(--text3)">Processing FPS</td>
+                  <td style="font-family:var(--mono);text-align:right">28 FPS</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Mini chart -->
+          <div class="card">
+            <div class="card-title">Hourly Trend · Today</div>
+            <div class="chart-wrap" style="height:130px">
+              <canvas id="camChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ PAGE: SETTINGS ══════════════════════════════ -->
+    <div class="page" id="page-settings">
+      <div class="page-header fade-in">
+        <div>
+          <div class="page-title">Settings</div>
+          <div class="page-subtitle">System configuration · UC-11</div>
+        </div>
+        <div class="page-actions">
+          <button class="btn btn-ghost btn-sm">Reset to Default</button>
+          <button class="btn btn-primary btn-sm">💾 Save Configuration</button>
+        </div>
+      </div>
+
+      <div class="card fade-in">
+        <div class="settings-section">
+          <div class="settings-section-title">Density Thresholds · UC-07</div>
+          <div class="settings-row">
+            <div class="settings-field">
+              <label>Low Density Ceiling (%)</label>
+              <input type="number" value="40" min="0" max="100">
+            </div>
+            <div class="settings-field">
+              <label>Medium Density Range (%)</label>
+              <div style="display:flex;gap:8px;align-items:center">
+                <input type="number" value="40" style="flex:1">
+                <span style="color:var(--text3);font-size:12px">to</span>
+                <input type="number" value="70" style="flex:1">
+              </div>
+            </div>
+            <div class="settings-field">
+              <label>High Density Floor (%)</label>
+              <input type="number" value="70" min="0" max="100">
+            </div>
+          </div>
+        </div>
+        <div class="divider"></div>
+        <div class="settings-section" style="margin-top:16px">
+          <div class="settings-section-title">Alert Configuration · UC-08</div>
+          <div class="settings-row">
+            <div class="settings-field">
+              <label>Alert Trigger Level</label>
+              <select>
+                <option>High Density (&gt;70%)</option>
+                <option>Medium Density (&gt;40%)</option>
+                <option>Custom</option>
+              </select>
+            </div>
+            <div class="settings-field">
+              <label>Calculation Interval (minutes)</label>
+              <select>
+                <option>5</option>
+                <option selected>15</option>
+                <option>30</option>
+              </select>
+            </div>
+            <div class="settings-field">
+              <label>YOLOv8 Confidence Threshold</label>
+              <input type="number" value="0.50" min="0" max="1" step="0.05">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card fade-in">
+        <div class="card-title">Camera Management</div>
+        <div class="cam-table-wrap">
+          <table class="stbl">
+            <thead>
+              <tr>
+                <th>Camera ID</th>
+                <th>Location</th>
+                <th>Direction</th>
+                <th>Road Capacity</th>
+                <th>RTSP URL</th>
+                <th>Status</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="cam-id">CAM-01</td>
+                <td>Lake Laut Tawar</td>
+                <td style="font-family:var(--mono);font-size:12px;color:var(--text3)">Inbound</td>
+                <td style="font-family:var(--mono)">35 veh</td>
+                <td style="font-family:var(--mono);font-size:11px;color:var(--text3)">rtsp://192.168.1.101</td>
+                <td><span class="badge badge-active"><span class="badge-dot" style="background:var(--green)"></span>Active</span></td>
+                <td><button class="btn btn-ghost btn-sm">Edit</button></td>
+              </tr>
+              <tr>
+                <td class="cam-id">CAM-02</td>
+                <td>Lake Laut Tawar</td>
+                <td style="font-family:var(--mono);font-size:12px;color:var(--text3)">Outbound</td>
+                <td style="font-family:var(--mono)">40 veh</td>
+                <td style="font-family:var(--mono);font-size:11px;color:var(--text3)">rtsp://192.168.1.102</td>
+                <td><span class="badge badge-active"><span class="badge-dot" style="background:var(--green)"></span>Active</span></td>
+                <td><button class="btn btn-ghost btn-sm">Edit</button></td>
+              </tr>
+              <tr>
+                <td class="cam-id">CAM-03</td>
+                <td>Pantan Terong</td>
+                <td style="font-family:var(--mono);font-size:12px;color:var(--text3)">Bidirectional</td>
+                <td style="font-family:var(--mono)">30 veh</td>
+                <td style="font-family:var(--mono);font-size:11px;color:var(--text3)">rtsp://192.168.1.103</td>
+                <td><span class="badge badge-active"><span class="badge-dot" style="background:var(--green)"></span>Active</span></td>
+                <td><button class="btn btn-ghost btn-sm">Edit</button></td>
+              </tr>
+              <tr>
+                <td class="cam-id">CAM-04</td>
+                <td>Takengon City</td>
+                <td style="font-family:var(--mono);font-size:12px;color:var(--text3)">Bidirectional</td>
+                <td style="font-family:var(--mono)">50 veh</td>
+                <td style="font-family:var(--mono);font-size:11px;color:var(--text3)">rtsp://192.168.1.104</td>
+                <td><span class="badge badge-active"><span class="badge-dot" style="background:var(--green)"></span>Active</span></td>
+                <td><button class="btn btn-ghost btn-sm">Edit</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div style="margin-top:14px">
+          <button class="btn btn-ghost btn-sm">⊕ Add Camera</button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+  const API = "http://localhost:8000/api/v1";
+
+// ── CLOCK ──────────────────────────────────────────
+function tick() {
+  const now = new Date();
+  document.getElementById('clock').textContent = now.toLocaleTimeString('en-GB');
+  document.getElementById('lastUpdate').textContent =
+    'Updated ' + now.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
+}
+tick();
+setInterval(tick, 1000);
+
+// ── PAGE SWITCH ────────────────────────────────────
+function switchPage(name, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-link').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  btn.classList.add('active');
+  if (name === 'dashboard') loadDashboard();
+  if (name === 'cameras') loadCameras();
+}
+
+// ── ACKNOWLEDGE ALERT ─────────────────────────────
+function acknowledgeAlert(btn) {
+  const item = btn.closest('.alert-item');
+  item.style.transition = 'opacity .3s, transform .3s';
+  item.style.opacity = '0';
+  item.style.transform = 'translateX(10px)';
+  setTimeout(() => item.remove(), 300);
+}
+
+// ── LOAD DASHBOARD ────────────────────────────────
+async function loadDashboard() {
+  try {
+    const [camsRes, detectRes] = await Promise.all([
+      fetch(`${API}/cameras/`),
+      fetch(`${API}/detections/`)
+    ]);
+    const cameras = await camsRes.json();
+    const summary = await detectRes.json();
+
+    const activeCams = cameras.filter(c => c.status === 'active');
+    document.querySelector('#page-dashboard .stat-value[style*="accent"]').textContent = activeCams.length;
+
+    // Update camera feeds
+    const feedGrid = document.querySelector('.feed-grid');
+    feedGrid.innerHTML = activeCams.map((cam, i) => `
+
+  
+      <div class="feed-card">
+        <div class="feed-header">
+          <div>
+            <div class="feed-cam-id">${cam.camera_id}</div>
+            <div class="feed-loc">${cam.location_name}</div>
+          </div>
+          <span class="badge badge-active"><span class="badge-dot" style="background:var(--green)"></span>Active</span>
+        </div>
+        <div class="feed-screen">
+          <div class="feed-overlay"></div>
+          <div class="feed-scan" style="animation-delay:${i*0.7}s"></div>
+          <div class="feed-label">YOLOv8 · LIVE</div>
+          <video autoplay loop muted playsinline
+         style="width:100%;height:100%;object-fit:cover;position:absolute;top:0;left:0;opacity:0.85"
+         onloadeddata="this.play()">
+  	<source src="http://localhost:3000/cam${(i%4)+1}_loop.mp4" type="video/mp4">
+   </video>
+        </div>
+        <div class="feed-footer">
+          <div class="feed-count">Vehicles: <span id="count-${cam.camera_id}">-</span></div>
+          <div class="feed-count">Capacity: <span>${cam.road_capacity}</span></div>
+        </div>
+      </div>
+    `).join('');
+
+    // Update sidebar
+    const sidebar = document.querySelector('.sidebar');
+    const locationsHtml = activeCams.map(cam => `
+      <div class="location-item">
+        <div class="location-header">
+          <div class="location-dot" style="background:var(--green);box-shadow:0 0 5px var(--green)"></div>
+          <div class="location-name">${cam.location_name}</div>
+        </div>
+        <div class="cam-list">
+          <div class="cam-item">
+            <div class="cam-status-dot" style="background:var(--green)"></div>
+            ${cam.camera_id}
+          </div>
+        </div>
+      </div>
+    `).join('');
+    sidebar.innerHTML = `<div class="sidebar-label">Locations</div>${locationsHtml}<div class="divider" style="margin-top:auto"></div><div class="sidebar-label">Refresh rate · 5s</div><div class="sidebar-label" id="lastUpdate">Updated --:--</div>`;
+// Update vehicle counts
+    const dets = summary; // summary sudah berisi array detections
+    activeCams.forEach(cam => {
+      const el = document.getElementById('count-' + cam.camera_id);
+      if(el) {
+        const total = dets.filter(d => d.camera_id === cam.camera_id).reduce((s,d) => s+d.count, 0);
+        el.textContent = total;
+      }
+    });
+
+  } catch(e) {
+    console.error('Dashboard load error:', e);
+  }
+}
+
+// ── LOAD CAMERAS ──────────────────────────────────
+async function loadCameras() {
+  try {
+    const res = await fetch(`${API}/cameras/`);
+    const cameras = await res.json();
+    const activeCams = cameras.filter(c => c.status === 'active');
+
+    const select = document.querySelector('#page-cameras select');
+    select.innerHTML = activeCams.map(cam =>
+      `<option>${cam.camera_id} · ${cam.location_name}</option>`
+    ).join('');
+
+  } catch(e) {
+    console.error('Cameras load error:', e);
+  }
+}
+
+// ── CHARTS ────────────────────────────────────────
+const ctx1 = document.getElementById('densityChart').getContext('2d');
+new Chart(ctx1, {
+  type: 'line',
+  data: {
+    labels: ['08:00','09:00','10:00','11:00','12:00','13:00','14:00'],
+    datasets: [{
+      data: [15,18,22,28,35,42,38],
+      borderColor: '#4f8ef7',
+      backgroundColor: 'rgba(79,142,247,0.08)',
+      borderWidth: 2,
+      pointRadius: 3,
+      fill: true,
+      tension: 0.4
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#555b6a', font: { family: 'DM Mono', size: 10 } } },
+      y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#555b6a', font: { family: 'DM Mono', size: 10 } } }
+    }
+  }
+});
+
+const ctx2 = document.getElementById('reportChart').getContext('2d');
+new Chart(ctx2, {
+  type: 'bar',
+  data: {
+    labels: ['Mar 1','Mar 2','Mar 3','Mar 4','Mar 5','Mar 6','Mar 7'],
+    datasets: [{
+      data: [6850,8420,8920,7100,6400,7800,8100],
+      backgroundColor: ['#34d39933','#fbbf2433','#f8717133','#34d39933','#34d39933','#fbbf2433','#fbbf2433'],
+      borderColor: ['#34d399','#fbbf24','#f87171','#34d399','#34d399','#fbbf24','#fbbf24'],
+      borderWidth: 1.5,
+      borderRadius: 5
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { grid: { display: false }, ticks: { color: '#555b6a', font: { family: 'DM Mono', size: 10 } } },
+      y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#555b6a', font: { family: 'DM Mono', size: 10 } } }
+    }
+  }
+});
+
+const ctx3 = document.getElementById('camChart').getContext('2d');
+new Chart(ctx3, {
+  type: 'line',
+  data: {
+    labels: ['06','07','08','09','10','11','12','13','14','15','16','17'],
+    datasets: [{
+      data: [5,8,18,32,45,42,38,35,45,30,22,18],
+      borderColor: '#f87171',
+      backgroundColor: 'rgba(248,113,113,0.07)',
+      borderWidth: 1.5,
+      pointRadius: 2,
+      fill: true,
+      tension: 0.4
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { grid: { display: false }, ticks: { color: '#555b6a', font: { family: 'DM Mono', size: 9 } } },
+      y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#555b6a', font: { family: 'DM Mono', size: 9 } } }
+    }
+  }
+});
+
+// ── AUTO REFRESH ──────────────────────────────────
+loadDashboard();
+setInterval(() => {
+  // Hanya update stats, jangan reload video
+  fetch(`${API}/cameras/`).then(r => r.json()).then(cameras => {
+    const activeCams = cameras.filter(c => c.status === 'active');
+    document.querySelector('#page-dashboard .stat-value[style*="accent"]').textContent = activeCams.length;
+  }).catch(()=>{});
+}, 5000);
+</script>
+</body>
+</html>
