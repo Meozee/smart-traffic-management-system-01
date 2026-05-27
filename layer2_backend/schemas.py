@@ -62,3 +62,38 @@ class DetectionResponse(DetectionCreate):
     
     class Config:
         from_attributes = True
+
+# ==========================
+# SCHEMAS UNTUK TRAFFIC DENSITY
+# ==========================
+class TrafficDensityCreate(BaseModel):
+    camera_id: str
+    interval_start: datetime
+    interval_end: datetime
+    total_vehicles: int
+    inflow_count: int
+    outflow_count: int
+    density_ratio: float
+    density_level: str
+
+class TrafficDensityResponse(TrafficDensityCreate):
+    density_id: int
+    
+    class Config:
+        from_attributes = True
+
+
+# ==========================
+# SCHEMAS UNTUK ALERTS
+# ==========================
+class AlertCreate(BaseModel):
+    camera_id: str
+    message: str
+
+class AlertResponse(AlertCreate):
+    alert_id: int
+    is_read: Optional[bool] = False
+    timestamp: datetime
+
+    class Config:
+        from_attributes = True

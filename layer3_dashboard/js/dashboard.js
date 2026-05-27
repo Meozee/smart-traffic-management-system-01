@@ -33,7 +33,7 @@ async function updateDashboardAnalytics() {
 function updateDensityStatus(count) {
     const el = document.getElementById('density-status');
     if (!el) return;
-    
+
     // Logika sederhana: Misal kapasitas total 1000 kendaraan/hari
     if (count > 500) {
         el.textContent = "PADAT";
@@ -60,7 +60,7 @@ function renderTrendChart(data) {
     trendChartInstance = new Chart(ctx, {
         type: 'line',
         data: {
-            labels: Array.from({length: 24}, (_, i) => `${i}:00`),
+            labels: Array.from({ length: 24 }, (_, i) => `${i}:00`),
             datasets: [{
                 label: 'Jumlah Kendaraan',
                 data: hourlyData,
@@ -112,7 +112,12 @@ function renderClassificationChart(summary) {
 updateDashboardAnalytics();
 
 // Refresh data setiap 10 detik agar tetap real-time
-const dashboardInterval = setInterval(updateDashboardAnalytics, 10000);
+window.pageIntervalId = setInterval(updateDashboardAnalytics, 10000);
 
-// Bersihkan interval jika pindah halaman (PENTING!)
-window.addEventListener('hashchange', () => clearInterval(dashboardInterval), { once: true });
+// Jangan gunakan hashchange karena navigasi sekarang pakai loadPage()
+window.addEventListener('pagehide', () => {
+    if (window.pageIntervalId) {
+        clearInterval(window.pageIntervalId);
+        window.pageIntervalId = null;
+    }
+});

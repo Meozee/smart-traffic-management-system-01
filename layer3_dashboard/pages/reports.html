@@ -1,12 +1,12 @@
 <div class="header">
     <h1>Reports & Historical Data</h1>
-    <p>Riwayat deteksi kendaraan. Data diambil secara bertahap (Pagination) untuk menjaga performa sistem.</p>
+    <p>Riwayat deteksi kendaraan. Data diambil secara bertahap.</p>
 </div>
 
 <div class="action-row">
-    <button class="btn-export" onclick="exportTodayCSV()">
-        ⬇️ Export CSV (Hari Ini)
-    </button>
+    <button class="btn-export" onclick="exportTodayCSV()">⬇️ Export CSV</button>
+    <button class="btn-export" style="background-color: #d12424; margin-left: 10px;" onclick="exportToPDF()">📄 Export
+        PDF</button>
 </div>
 
 <div class="card table-card">
@@ -23,14 +23,19 @@
                 </tr>
             </thead>
             <tbody id="reports-body">
-                <tr><td colspan="5" style="text-align:center;color:#8b949e">Loading data...</td></tr>
+                <tr>
+                    <td colspan="5" style="text-align:center;color:#8b949e">Loading data...</td>
+                </tr>
             </tbody>
         </table>
     </div>
-    
+
     <div class="pagination-controls">
         <button id="btn-prev" onclick="changePage(-1)" disabled>⬅️ Sebelumnya</button>
         <span id="page-indicator">Halaman 1</span>
         <button id="btn-next" onclick="changePage(1)">Selanjutnya ➡️</button>
     </div>
 </div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>

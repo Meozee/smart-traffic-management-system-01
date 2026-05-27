@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,6 +8,7 @@
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
+
 <body>
     <nav class="topnav">
         <div class="logo">🚦 STMS <span>Central Aceh</span></div>
@@ -18,10 +20,12 @@
 
     <div class="wrapper">
         <aside class="sidebar">
-            <button class="nav-btn active" onclick="loadPage('dashboard')">📊 Dashboard</button>
-            <button class="nav-btn" onclick="loadPage('cameras')">📹 Live Cameras</button>
-            <button class="nav-btn" onclick="loadPage('reports')">📑 Reports & History</button>
-            <button class="nav-btn" onclick="loadPage('settings')">⚙️ Settings</button>
+            <button class="nav-btn active" data-page="dashboard" onclick="loadPage(event, 'dashboard')">📊
+                Dashboard</button>
+            <button class="nav-btn" data-page="cameras" onclick="loadPage(event, 'cameras')">📹 Live Cameras</button>
+            <button class="nav-btn" data-page="reports" onclick="loadPage(event, 'reports')">📑 Reports &
+                History</button>
+            <button class="nav-btn" data-page="settings" onclick="loadPage(event, 'settings')">⚙️ Settings</button>
         </aside>
 
         <main class="main-content" id="app-content">
@@ -31,4 +35,5 @@
 
     <script src="js/main.js"></script>
 </body>
+
 </html>

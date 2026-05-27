@@ -12,8 +12,12 @@ from datetime import datetime
 # s_id = "VID-01"
 
 # ====== DROIDCAM / HP ======
-source = "http://192.168.100.249:4747/video"
-s_id = "PHN-01"
+# source = "http://192.168.100.249:4747/video"
+# s_id = "PHN-01"
+
+# ====== VIDEO FILE LOKAL ======
+source = "traffic.mp4"
+s_id = "CAM-01"
 
 # ====== CCTV RTSP ======
 # source = "rtsp://admin:password@192.168.1.10:554/live"
@@ -21,7 +25,7 @@ s_id = "PHN-01"
 
 # ==================================================
 
-API_URL = "http://localhost:8000/api/v1/detections/"
+API_URL = "http://127.0.0.1:8000/api/v1/detections/"
 
 # Load YOLO model
 model = YOLO("yolov8n.pt")
@@ -92,12 +96,12 @@ while cap.isOpened():
 
                     # Payload API
                     payload = {
-                        "camera_id": s_id,
+                       "camera_id": s_id,  # Mengambil nilai "CAM-01" dari atas
                         "timestamp": datetime.now().isoformat(),
                         "vehicle_type": vehicle_type,
                         "count": total_count,
                         "direction": "inbound",
-                        "confidence": 0.8
+                        "confidence": float(confidence) if 'confidence' in locals() else 0.8
                     }
 
                     # Kirim ke backend
@@ -105,7 +109,8 @@ while cap.isOpened():
 
                         response = requests.post(
                             API_URL,
-                            json=payload
+                            json=payload,
+                            allow_redirects=False
                         )
 
                         print(f"📡 API Status: {response.status_code}")

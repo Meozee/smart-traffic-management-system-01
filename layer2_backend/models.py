@@ -56,3 +56,11 @@ class UserAccount(Base):
     role = Column(String(20), nullable=False) # supervisor/management/admin
     created_at = Column(TIMESTAMP, server_default=func.now())
     last_login = Column(TIMESTAMP, nullable=True)
+
+class Alert(Base):
+    __tablename__ = "alert"
+    alert_id = Column(BigInteger, primary_key=True, autoincrement=True)
+    camera_id = Column(String(20), ForeignKey("camera.camera_id", ondelete="CASCADE"))
+    message = Column(String(255))
+    timestamp = Column(TIMESTAMP, server_default=func.now()) # Menggunakan server_default untuk timestamp
+    is_read = Column(Boolean, default=False)
