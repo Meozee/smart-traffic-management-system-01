@@ -1,56 +1,80 @@
-<div class="header">
+<div class="dashboard-header">
     <h1>System Settings</h1>
-    <p>Kelola sumber kamera, kapasitas jalan, dan status operasional sistem.</p>
+    <p>Kelola threshold, alert config, dan manajemen kamera.</p>
 </div>
 
-<div class="card settings-card">
-    <h3>➕ Tambah / Update Kamera</h3>
-    <p style="color:#8b949e; font-size:0.85rem; margin-top:-8px; margin-bottom: 20px;">
-        Gunakan ID yang sama untuk memperbarui data kamera yang sudah ada.
-    </p>
-    
-    <form id="camera-form" class="cam-form">
-        <div class="form-row">
-            <div class="form-group">
-                <label>Camera ID *</label>
-                <input id="set-cam-id" type="text" placeholder="Contoh: CAM-01" required>
-            </div>
-            <div class="form-group">
-                <label>Nama Lokasi *</label>
-                <input id="set-cam-location" type="text" placeholder="Contoh: Simpang Empat Bebesen" required>
-            </div>
-        </div>
-        
-        <div class="form-row">
-            <div class="form-group" style="flex:2">
-                <label>Stream URL (DroidCam/RTSP) *</label>
-                <input id="set-cam-url" type="text" placeholder="http://192.168.x.x:4747/video" required>
-            </div>
-            <div class="form-group">
-                <label>Road Capacity</label>
-                <input id="set-cam-capacity" type="number" placeholder="100" value="100">
-            </div>
-        </div>
-        
-        <button type="submit" class="btn-save">💾 Simpan Konfigurasi</button>
-    </form>
+<div id="access-denied-msg" class="card alert-card" style="display:none; margin-bottom: 20px;">
+    <h3>⛔ Akses Ditolak</h3>
+    <p>Halaman Settings hanya dapat diakses oleh Administrator.</p>
+    <a class="btn-export" href="/pages/dashboard.html">Kembali ke Dashboard</a>
 </div>
 
-<div class="card table-card">
-    <h3>📋 Daftar Semua Kamera</h3>
-    <div class="table-container">
-        <table>
-            <thead>
-                <tr>
-                    <th>Camera ID</th>
-                    <th>Lokasi</th>
-                    <th>Status</th>
-                    <th>Aksi</th>
-                </tr>
-            </thead>
-            <tbody id="settings-camera-table">
-                <tr><td colspan="4" style="text-align:center;color:#8b949e">Loading...</td></tr>
-            </tbody>
-        </table>
+<div id="settings-content">
+    <div class="card settings-card">
+        <h3>Konfigurasi Density Threshold</h3>
+        <p>Nilai dalam persen (%). Low → di bawah nilai ini, High → di atas nilai ini.</p>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Low Threshold (%)</label>
+                <input id="threshold-low" type="number" min="0" max="100" value="40">
+            </div>
+            <div class="form-group">
+                <label>High Threshold (%)</label>
+                <input id="threshold-high" type="number" min="0" max="100" value="70">
+            </div>
+        </div>
+        <button class="btn-save" onclick="saveThresholds()">💾 Simpan Threshold</button>
+        <div id="threshold-message" class="success-msg" style="display:none; margin-top:10px;">✅ Threshold berhasil
+            disimpan.</div>
+    </div>
+
+    <div class="card settings-card" style="margin-top:20px;">
+        <h3>➕ Tambah / Update Kamera</h3>
+        <p style="color:#8b949e; font-size:0.85rem; margin-top:-8px; margin-bottom: 20px;">Gunakan ID yang sama untuk
+            memperbarui data kamera yang sudah ada.</p>
+        <form id="camera-form" class="cam-form">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Camera ID *</label>
+                    <input id="set-cam-id" type="text" placeholder="Contoh: CAM-01" required>
+                </div>
+                <div class="form-group">
+                    <label>Nama Lokasi *</label>
+                    <input id="set-cam-location" type="text" placeholder="Contoh: Simpang Empat Bebesen" required>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex:2">
+                    <label>Stream URL (DroidCam/RTSP) *</label>
+                    <input id="set-cam-url" type="text" placeholder="http://192.168.x.x:4747/video" required>
+                </div>
+                <div class="form-group">
+                    <label>Road Capacity</label>
+                    <input id="set-cam-capacity" type="number" placeholder="100" value="100">
+                </div>
+            </div>
+            <button type="submit" class="btn-save">💾 Simpan Konfigurasi</button>
+        </form>
+    </div>
+
+    <div class="card table-card" style="margin-top:20px;">
+        <h3>📋 Daftar Semua Kamera</h3>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Camera ID</th>
+                        <th>Lokasi</th>
+                        <th>Status</th>
+                        <th>Aksi</th>
+                    </tr>
+                </thead>
+                <tbody id="settings-camera-table">
+                    <tr>
+                        <td colspan="4" style="text-align:center;color:#8b949e">Loading...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>

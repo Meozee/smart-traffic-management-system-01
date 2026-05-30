@@ -1,5 +1,5 @@
 // Konfigurasi Global
-const API_BASE = "http://localhost:8000/api/v1";
+const API_URL = "http://localhost:8000/api/v1";
 const BASE_PATH = window.location.pathname.includes('/layer3_dashboard/') ? '' : 'layer3_dashboard/';
 
 let lastAlertId = 0;
@@ -82,23 +82,24 @@ setInterval(async () => {
     if (!localStorage.getItem("access_token")) return;
 
     try {
-        const res = await fetch(`${API_BASE}/detections/alerts/latest`);
+        const res = await apiFetch(`${API_URL}/detections/alerts/latest`);
+        if (!res || !res.ok) return;
         const alerts = await res.json();
 
         const latest = alerts[0];
         if (latest && latest.alert_id > lastAlertId) {
             showNotification(latest.message);
-            // Tandai sebagai sudah dibaca di backend
             try {
-                await fetch(`${API_BASE}/detections/alerts/${latest.alert_id}/read`, { method: 'PATCH' });
-            } catch (e) { console.warn('Gagal menandai alert read'); }
-
+                await apiFetch(`${API_URL}/detections/alerts/${latest.alert_id}/read`, { method: 'PATCH' });
+            } catch (e) {
+                console.warn('Gagal menandai alert read');
+            }
             lastAlertId = latest.alert_id;
         }
     } catch (e) {
-        console.error("Polling alert gagal");
+        console.error('Polling alert gagal', e);
     }
-}, 10000);
+}, POLL_INTERVAL);
 
 function showNotification(msg) {
     const toast = document.createElement('div');

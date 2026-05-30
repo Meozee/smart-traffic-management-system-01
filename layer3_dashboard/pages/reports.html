@@ -1,41 +1,56 @@
-<div class="header">
+<div class="dashboard-header">
     <h1>Reports & Historical Data</h1>
-    <p>Riwayat deteksi kendaraan. Data diambil secara bertahap.</p>
+    <p>Filter data density untuk laporan CSV/PDF dan ringkasan statistik.</p>
 </div>
 
-<div class="action-row">
-    <button class="btn-export" onclick="exportTodayCSV()">⬇️ Export CSV</button>
-    <button class="btn-export" style="background-color: #d12424; margin-left: 10px;" onclick="exportToPDF()">📄 Export
-        PDF</button>
-</div>
-
-<div class="card table-card">
-    <h3>Log Deteksi Kendaraan</h3>
-    <div class="table-container">
-        <table id="reports-table">
-            <thead>
-                <tr>
-                    <th>Timestamp (WIB)</th>
-                    <th>Camera ID</th>
-                    <th>Tipe Kendaraan</th>
-                    <th>Arah</th>
-                    <th>Confidence</th>
-                </tr>
-            </thead>
-            <tbody id="reports-body">
-                <tr>
-                    <td colspan="5" style="text-align:center;color:#8b949e">Loading data...</td>
-                </tr>
-            </tbody>
-        </table>
+<div class="card report-filter-card">
+    <h3>Filter Laporan</h3>
+    <div class="form-row">
+        <div class="form-group">
+            <label>Tanggal Mulai</label>
+            <input id="filter-start-date" type="date">
+        </div>
+        <div class="form-group">
+            <label>Tanggal Akhir</label>
+            <input id="filter-end-date" type="date">
+        </div>
+        <div class="form-group">
+            <label>Kamera</label>
+            <select id="filter-camera">
+                <option value="">Semua Kamera</option>
+            </select>
+        </div>
     </div>
+    <button class="btn-save" onclick="generateReport()">Generate Report</button>
+</div>
 
-    <div class="pagination-controls">
-        <button id="btn-prev" onclick="changePage(-1)" disabled>⬅️ Sebelumnya</button>
-        <span id="page-indicator">Halaman 1</span>
-        <button id="btn-next" onclick="changePage(1)">Selanjutnya ➡️</button>
+<div id="report-summary" class="dashboard-grid" style="display:none; margin-top: 20px;">
+    <div class="card stat">
+        <h4>Total Kendaraan</h4>
+        <p id="sum-total-vehicles">0</p>
+    </div>
+    <div class="card stat">
+        <h4>Rata-rata Density</h4>
+        <p id="sum-avg-density">-</p>
+    </div>
+    <div class="card stat">
+        <h4>Jam Tersibuk</h4>
+        <p id="sum-peak-hour">-</p>
+    </div>
+    <div class="card stat">
+        <h4>Hari Tersibuk</h4>
+        <p id="sum-peak-day">-</p>
     </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+<div id="export-buttons" class="action-row" style="display:none; margin-top: 15px; gap: 10px;">
+    <button class="btn-export" onclick="exportReport('csv')">⬇️ Export CSV</button>
+    <button class="btn-export" style="background-color: #d12424;" onclick="exportReport('pdf')">📄 Export PDF</button>
+</div>
+
+<div class="card table-card" style="margin-top: 20px;">
+    <h3>Daily Traffic Breakdown</h3>
+    <div id="report-table-container" class="table-container">
+        <div class="loading-state">Silakan pilih filter untuk menampilkan data.</div>
+    </div>
+</div>

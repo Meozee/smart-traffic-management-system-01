@@ -1,10 +1,15 @@
 async function initCamerasPage() {
     const container = document.getElementById('cameras-grid');
-    
+    if (!container) return;
+
     try {
-        const response = await fetch(`${API_BASE}/cameras/`);
+        const response = await apiFetch(`${API_BASE}/api/v1/cameras`);
+        if (!response || !response.ok) {
+            container.innerHTML = '<div class="loading-state">⚠️ Gagal memuat feed kamera.</div>';
+            return;
+        }
+
         const cameras = await response.json();
-        
         const activeCams = cameras.filter(c => c.status === 'active');
 
         if (activeCams.length === 0) {
@@ -20,7 +25,7 @@ async function initCamerasPage() {
                 </div>
                 
                 <div class="stream-container">
-                    <img src="${API_BASE}/stream/${cam.camera_id}" 
+                    <img src="${API_BASE}/api/v1/stream/${cam.camera_id}" 
                          alt="Stream ${cam.camera_id}"
                          onerror="this.parentElement.innerHTML='<div class=\'stream-error\'>⚠️ Koneksi Terputus</div>'">
                 </div>
@@ -41,23 +46,31 @@ async function initCamerasPage() {
     }
 }
 
-// Update angka di layar saja (cepat)
 function updateLineDisplay(id, val) {
-    document.getElementById(`val-${id}`).textContent = val;
+    const el = document.getElementById(`val-${id}`);
+    if (el) el.textContent = val;
 }
 
-// Simpan ke database (ketika user lepas klik slider)
 async function saveLinePosition(id, val) {
     try {
-        const res = await fetch(`${API_BASE}/cameras/${id}/line?y_position=${val}`, {
+        const res = await apiFetch(`${API_BASE}/api/v1/cameras/${id}/line?y_position=${val}`, {
             method: 'PATCH'
         });
-        if (res.ok) {
+        if (res && res.ok) {
             console.log(`Garis ${id} disimpan di ${val}px`);
         }
     } catch (e) {
-        console.error("Gagal simpan posisi garis");
+        console.error('Gagal simpan posisi garis', e);
     }
 }
 
-initCamerasPage();
+function initCamerasScript() {
+    if (!getToken()) return;
+    initCamerasPage();
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initCamerasScript);
+} else {
+    initCamerasScript();
+}

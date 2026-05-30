@@ -1,73 +1,90 @@
-// Pastikan variabel chart didefinisikan agar bisa di-reset (destroy)
-if (typeof trendChartInstance !== 'undefined') trendChartInstance.destroy();
-if (typeof classChartInstance !== 'undefined') classChartInstance.destroy();
+let currentAlertId = null;
+let trendChartInstance = null;
+let classChartInstance = null;
+const startTime = Date.now();
 
-var trendChartInstance = null;
-var classChartInstance = null;
-
-async function updateDashboardAnalytics() {
+async function fetchDashboardData() {
     try {
-        const today = getTodayWIB(); // Fungsi dari main.js
+        const densityRes = await apiFetch(`${API_BASE}/api/v1/density/realtime`);
+        if (densityRes && densityRes.ok) {
+            const densityData = await densityRes.json();
+            updateDensityWidgets(densityData);
+            renderTrendChart(densityData);
+            renderClassificationChart(densityData);
+        }
 
-        // 1. Ambil Data Trend & Total (Gunakan Endpoint Range)
-        const resRange = await fetch(`${API_BASE}/detections/range?start=${today}&end=${today}&limit=5000`);
-        const todayData = await resRange.json();
+        const alertsRes = await apiFetch(`${API_BASE}/api/v1/alerts?status=active`);
+        if (alertsRes && alertsRes.ok) {
+            const alertsData = await alertsRes.json();
+            updateAlertWidget(alertsData);
+            showAlertNotification(alertsData);
+        }
 
-        // 2. Ambil Data Klasifikasi (Gunakan Endpoint Summary)
-        const resSummary = await fetch(`${API_BASE}/detections/summary?date=${today}`);
-        const summaryData = await resSummary.json();
-
-        // Update Angka & Status
-        document.getElementById('total-count').textContent = todayData.length.toLocaleString();
-        updateDensityStatus(todayData.length);
-
-        // Render Grafik
-        renderTrendChart(todayData);
-        renderClassificationChart(summaryData);
-
+        const camerasRes = await apiFetch(`${API_BASE}/api/v1/cameras`);
+        if (camerasRes && camerasRes.ok) {
+            const camerasData = await camerasRes.json();
+            updateActiveCamerasWidget(camerasData);
+        }
     } catch (error) {
-        console.error("Dashboard Error:", error);
+        console.error('Dashboard Error:', error);
     }
 }
 
-function updateDensityStatus(count) {
-    const el = document.getElementById('density-status');
-    if (!el) return;
+function updateDensityWidgets(densityData) {
+    const totalVehicles = densityData.reduce((sum, d) => sum + (d.total_vehicles || 0), 0);
+    document.getElementById('val-vehicles').textContent = totalVehicles.toLocaleString();
+}
 
-    // Logika sederhana: Misal kapasitas total 1000 kendaraan/hari
-    if (count > 500) {
-        el.textContent = "PADAT";
-        el.style.color = "#f85149";
-    } else if (count > 200) {
-        el.textContent = "RAMAI";
-        el.style.color = "#fbbf24";
+function updateActiveCamerasWidget(camerasData) {
+    const activeCount = camerasData.filter(c => c.status === 'active').length;
+    document.getElementById('val-active-cameras').textContent = activeCount;
+}
+
+function updateAlertWidget(alertsData) {
+    document.getElementById('val-alerts').textContent = alertsData.length;
+}
+
+function showAlertNotification(alertsData) {
+    const bar = document.getElementById('alert-notification-bar');
+    const text = document.getElementById('alert-notification-text');
+    if (!bar || !text) return;
+
+    if (alertsData.length > 0) {
+        const latest = alertsData[0];
+        currentAlertId = latest.alert_id;
+        text.textContent = `⚠️ Alert: ${latest.message}`;
+        bar.style.display = 'flex';
     } else {
-        el.textContent = "LANCAR";
-        el.style.color = "#3fb950";
+        bar.style.display = 'none';
+        currentAlertId = null;
     }
 }
 
-function renderTrendChart(data) {
-    const ctx = document.getElementById('trafficTrendChart').getContext('2d');
-    const hourlyData = new Array(24).fill(0);
+function updateUptimeWidget() {
+    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+    const hours = Math.floor(elapsed / 3600);
+    const minutes = Math.floor((elapsed % 3600) / 60);
+    const uptimeEl = document.getElementById('val-uptime');
+    if (!uptimeEl) return;
+    uptimeEl.textContent = `${hours > 0 ? hours + 'j ' : ''}${minutes}m`;
+}
 
-    data.forEach(item => {
-        const hour = new Date(item.timestamp).getHours();
-        hourlyData[hour]++;
-    });
+function renderTrendChart(densityData) {
+    const ctx = document.getElementById('trafficTrendChart').getContext('2d');
+    const labels = densityData.map(d => d.camera_id || 'Unknown');
+    const values = densityData.map(d => d.total_vehicles || 0);
 
     if (trendChartInstance) trendChartInstance.destroy();
     trendChartInstance = new Chart(ctx, {
-        type: 'line',
+        type: 'bar',
         data: {
-            labels: Array.from({ length: 24 }, (_, i) => `${i}:00`),
+            labels,
             datasets: [{
-                label: 'Jumlah Kendaraan',
-                data: hourlyData,
+                label: 'Total Kendaraan',
+                data: values,
+                backgroundColor: 'rgba(88, 166, 255, 0.7)',
                 borderColor: '#58a6ff',
-                backgroundColor: 'rgba(88, 166, 255, 0.1)',
-                fill: true,
-                tension: 0.3
+                borderWidth: 1
             }]
         },
         options: {
@@ -76,25 +93,28 @@ function renderTrendChart(data) {
             plugins: { legend: { display: false } },
             scales: {
                 y: { beginAtZero: true, grid: { color: '#30363d' } },
-                x: { grid: { display: false } }
+                x: { ticks: { color: '#c9d1d9' }, grid: { display: false } }
             }
         }
     });
 }
 
-function renderClassificationChart(summary) {
+function renderClassificationChart(densityData) {
     const ctx = document.getElementById('classificationChart').getContext('2d');
-    const labels = Object.keys(summary).map(l => l.toUpperCase());
-    const values = Object.values(summary);
+    const counts = { Low: 0, Medium: 0, High: 0 };
+    densityData.forEach(d => {
+        const level = d.density_level || 'Low';
+        if (counts[level] !== undefined) counts[level] += 1;
+    });
 
     if (classChartInstance) classChartInstance.destroy();
     classChartInstance = new Chart(ctx, {
         type: 'doughnut',
         data: {
-            labels: labels,
+            labels: Object.keys(counts),
             datasets: [{
-                data: values,
-                backgroundColor: ['#58a6ff', '#3fb950', '#fbbf24', '#f85149'],
+                data: Object.values(counts),
+                backgroundColor: ['#3fb950', '#fbbf24', '#f85149'],
                 borderWidth: 0
             }]
         },
@@ -108,16 +128,28 @@ function renderClassificationChart(summary) {
     });
 }
 
-// Jalankan update pertama kali
-updateDashboardAnalytics();
-
-// Refresh data setiap 10 detik agar tetap real-time
-window.pageIntervalId = setInterval(updateDashboardAnalytics, 10000);
-
-// Jangan gunakan hashchange karena navigasi sekarang pakai loadPage()
-window.addEventListener('pagehide', () => {
-    if (window.pageIntervalId) {
-        clearInterval(window.pageIntervalId);
-        window.pageIntervalId = null;
+async function acknowledgeAlert(alertId) {
+    if (!alertId) return;
+    const res = await apiFetch(`${API_BASE}/api/v1/alerts/${alertId}/acknowledge`, { method: 'POST' });
+    if (res && res.ok) {
+        document.getElementById('alert-notification-bar').style.display = 'none';
+        currentAlertId = null;
+        fetchDashboardData();
+    } else {
+        alert('Gagal melakukan acknowledge alert.');
     }
-});
+}
+
+function initDashboardPage() {
+    if (!getToken()) return;
+    fetchDashboardData();
+    setInterval(fetchDashboardData, POLL_INTERVAL);
+    updateUptimeWidget();
+    setInterval(updateUptimeWidget, 60000);
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initDashboardPage);
+} else {
+    initDashboardPage();
+}

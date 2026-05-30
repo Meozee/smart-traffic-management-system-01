@@ -38,3 +38,56 @@ while cap.isOpened():
 cap.release()
 out.release()
 print("Selesai! Cek hasilnya di folder tests/output_result.mp4")
+
+
+def test_cv_module_basic():
+    """Quick smoke test untuk memverifikasi cv_module.py berfungsi."""
+    from cv_module import VideoCapture, VehicleDetector, Detection
+
+    # Test VideoCapture
+    cap = VideoCapture("traffic.mp4")
+    opened = cap.open("traffic.mp4")
+    print(f"[VideoCapture] open('traffic.mp4'): {opened}")
+
+    if opened:
+        frame = cap.read_frame()
+        print(f"[VideoCapture] read_frame(): {'OK' if frame is not None else 'FAILED'}")
+
+        if frame is not None:
+            preprocessed = cap.preprocess(frame)
+            if preprocessed is not None:
+                print(f"[VideoCapture] preprocess(): shape={preprocessed.shape}, dtype={preprocessed.dtype}, "
+                      f"min={preprocessed.min():.3f}, max={preprocessed.max():.3f}")
+            else:
+                print("[VideoCapture] preprocess(): FAILED (returned None)")
+
+        cap.release()
+        print("[VideoCapture] release(): OK")
+
+    # Test VehicleDetector (hanya jika model ada)
+    import os
+    if os.path.exists("yolov8n.pt"):
+        try:
+            detector = VehicleDetector("yolov8n.pt", 0.5)
+            print(f"[VehicleDetector] load_model(): device={detector.device}")
+
+            if opened:
+                cap2 = VideoCapture("traffic.mp4")
+                cap2.open("traffic.mp4")
+                frame2 = cap2.read_frame()
+                prep2 = cap2.preprocess(frame2)
+                detections = detector.detect(prep2)
+                print(f"[VehicleDetector] detect(): {len(detections)} detections found")
+                for det in detections[:3]:  # tampilkan max 3
+                    print(f"  → {det.vehicle_type}, conf={det.confidence:.2f}, dir={det.direction_flow}")
+                cap2.release()
+        except Exception as e:
+            print(f"[VehicleDetector] ERROR: {e}")
+    else:
+        print("[VehicleDetector] yolov8n.pt tidak ditemukan, skip test model.")
+
+    print("\n✅ cv_module basic test selesai.")
+
+
+if __name__ == "__main__":
+    test_cv_module_basic()

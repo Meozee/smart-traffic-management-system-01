@@ -1,99 +1,250 @@
-from pydantic import BaseModel
-from typing import Optional
+"""
+Pydantic v2 Data Validation Schemas for STMS
+
+Defines request/response models for all API endpoints.
+Includes validators for enum fields (direction, role, density_level).
+All response models use ConfigDict(from_attributes=True) for ORM compatibility.
+"""
+
+from pydantic import BaseModel, ConfigDict, field_validator
+from typing import Optional, List
 from datetime import datetime
 
-# ==========================
-# SCHEMAS UNTUK KAMERA
-# ==========================
-class CameraBase(BaseModel):
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SCHEMAS: CAMERA
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class CameraCreate(BaseModel):
+    """Request schema for creating a new camera."""
     camera_id: str
     location_name: str
+    road_capacity: int = 50
+    direction: str = "Bidirectional"
+    status: str = "active"
     segment_id: Optional[str] = None
+    
+    @field_validator('direction')
+    @classmethod
+    def validate_direction(cls, v: str) -> str:
+        valid = {"Inbound", "Outbound", "Bidirectional"}
+        if v not in valid:
+            raise ValueError(f"direction must be one of {valid}, got {v}")
+        return v
+
+
+class CameraUpdate(BaseModel):
+    """Request schema for updating a camera."""
+    location_name: Optional[str] = None
+    road_capacity: Optional[int] = None
+    direction: Optional[str] = None
+    status: Optional[str] = None
+    
+    @field_validator('direction')
+    @classmethod
+    def validate_direction(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        valid = {"Inbound", "Outbound", "Bidirectional"}
+        if v not in valid:
+            raise ValueError(f"direction must be one of {valid}, got {v}")
+        return v
+
+
+class CameraResponse(BaseModel):
+    """Response schema for camera data."""
+    camera_id: str
+    location_name: str
     road_capacity: int
-    status: Optional[str] = "active"
-    stream_url: Optional[str] = None
-    
-    # --- FITUR BARU: Input posisi Y-Axis dari UI ---
-    virtual_line_y: Optional[int] = 300 
-    # -----------------------------------------------
-
-class CameraCreate(CameraBase):
-    pass
-
-class CameraResponse(CameraBase):
+    direction: str
+    status: str
     created_at: datetime
-
-    class Config:
-        from_attributes = True
-
-# ==========================
-# SCHEMAS UNTUK AUTH & USER
-# ==========================
-class UserCreate(BaseModel):
-    username: str
-    password: str
-    role: str
-
-class UserResponse(BaseModel):
-    username: str
-    role: str
+    segment_id: Optional[str] = None
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
-class Token(BaseModel):
-    access_token: str
-    token_type: str
 
-# ==========================
-# SCHEMAS UNTUK DETECTIONS
-# ==========================
+# ═══════════════════════════════════════════════════════════════════════════════
+# SCHEMAS: VEHICLE DETECTION
+# ═══════════════════════════════════════════════════════════════════════════════
+
 class DetectionCreate(BaseModel):
+    """Request schema for creating a vehicle detection."""
     camera_id: str
     timestamp: datetime
     vehicle_type: str
-    count: int
+    count: int = 1
     direction: str
     bbox_data: Optional[dict] = None
-    confidence: float
+    confidence: Optional[float] = None
+
 
 class DetectionResponse(DetectionCreate):
+    """Response schema for vehicle detection."""
     detection_id: int
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
-# ==========================
-# SCHEMAS UNTUK TRAFFIC DENSITY
-# ==========================
-class TrafficDensityCreate(BaseModel):
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SCHEMAS: TRAFFIC DENSITY
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class DensityResponse(BaseModel):
+    """Response schema for traffic density metrics."""
+    density_id: int
     camera_id: str
     interval_start: datetime
     interval_end: datetime
     total_vehicles: int
     inflow_count: int
     outflow_count: int
-    density_ratio: float
+    density_ratio: Optional[float]
     density_level: str
-
-class TrafficDensityResponse(TrafficDensityCreate):
-    density_id: int
     
-    class Config:
-        from_attributes = True
+    @field_validator('density_level')
+    @classmethod
+    def validate_density_level(cls, v: str) -> str:
+        valid = {"Low", "Medium", "High"}
+        if v not in valid:
+            raise ValueError(f"density_level must be one of {valid}, got {v}")
+        return v
+    
+    model_config = ConfigDict(from_attributes=True)
 
 
-# ==========================
-# SCHEMAS UNTUK ALERTS
-# ==========================
-class AlertCreate(BaseModel):
-    camera_id: str
-    message: str
+class ReportSummary(BaseModel):
+    """Summary statistics for traffic report."""
+    total_vehicles: int
+    average_density_ratio: float
+    peak_hour: Optional[str] = None
+    peak_day: Optional[str] = None
+    density_distribution: dict
 
-class AlertResponse(AlertCreate):
+
+class DensityHistoryResponse(BaseModel):
+    """Response schema for density history with summary."""
+    data: List[DensityResponse]
+    summary: ReportSummary
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SCHEMAS: ALERT
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class AlertResponse(BaseModel):
+    """Response schema for traffic alert."""
     alert_id: int
-    is_read: Optional[bool] = False
-    timestamp: datetime
+    density_id: int
+    camera_id: str
+    triggered_at: datetime
+    density_level: str
+    alert_type: str
+    severity: str
+    message: str
+    acknowledged: bool
+    acknowledged_at: Optional[datetime] = None
+    acknowledged_by: Optional[str] = None
+    
+    @field_validator('density_level')
+    @classmethod
+    def validate_density_level(cls, v: str) -> str:
+        valid = {"Low", "Medium", "High"}
+        if v not in valid:
+            raise ValueError(f"density_level must be one of {valid}, got {v}")
+        return v
+    
+    model_config = ConfigDict(from_attributes=True)
 
-    class Config:
-        from_attributes = True
+
+class AlertAcknowledgeRequest(BaseModel):
+    """Request schema for acknowledging an alert."""
+    acknowledged_by: str
+
+
+class AlertAcknowledgeResponse(BaseModel):
+    """Response schema for acknowledged alert."""
+    alert_id: int
+    acknowledged: bool
+    acknowledged_at: datetime
+    acknowledged_by: str
+    
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SCHEMAS: AUTHENTICATION & USER
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class UserCreate(BaseModel):
+    """Request schema for user registration."""
+    username: str
+    password: str
+    role: str = "supervisor"
+    
+    @field_validator('role')
+    @classmethod
+    def validate_role(cls, v: str) -> str:
+        valid = {"supervisor", "management", "admin"}
+        if v not in valid:
+            raise ValueError(f"role must be one of {valid}, got {v}")
+        return v
+
+
+class UserLogin(BaseModel):
+    """Request schema for user login."""
+    username: str
+    password: str
+
+
+class UserResponse(BaseModel):
+    """Response schema for user account."""
+    user_id: str
+    username: str
+    role: str
+    created_at: datetime
+    last_login: Optional[datetime] = None
+    
+    @field_validator('role')
+    @classmethod
+    def validate_role(cls, v: str) -> str:
+        valid = {"supervisor", "management", "admin"}
+        if v not in valid:
+            raise ValueError(f"role must be one of {valid}, got {v}")
+        return v
+    
+    model_config = ConfigDict(from_attributes=True)
+
+
+class Token(BaseModel):
+    """Response schema for JWT token."""
+    access_token: str
+    token_type: str = "bearer"
+    role: str
+    username: str
+
+
+class TokenData(BaseModel):
+    """Token claim data."""
+    username: Optional[str] = None
+    role: Optional[str] = None
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SCHEMAS: REPORT & EXPORT
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class ReportExportParams(BaseModel):
+    """Request schema for exporting traffic report."""
+    format: str
+    start_date: datetime
+    end_date: datetime
+    camera_id: Optional[str] = None
+    
+    @field_validator('format')
+    @classmethod
+    def validate_format(cls, v: str) -> str:
+        valid = {"pdf", "csv"}
+        if v not in valid:
+            raise ValueError(f"format must be one of {valid}, got {v}")
+        return v

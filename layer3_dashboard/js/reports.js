@@ -1,136 +1,163 @@
-// Konfigurasi Pagination
-let currentPage = 1;
-const itemsPerPage = 50;
-let currentDataLength = 0;
+let reportParams = null;
 
-async function loadReportsData() {
-    const tbody = document.getElementById('reports-body');
-    const btnPrev = document.getElementById('btn-prev');
-    const btnNext = document.getElementById('btn-next');
-    const indicator = document.getElementById('page-indicator');
+async function initReportsPage() {
+    if (!getToken()) return;
+    await populateCameraDropdown();
+    setupDefaultDateRange();
+}
 
-    if (!tbody) return;
+async function populateCameraDropdown() {
+    const select = document.getElementById('filter-camera');
+    if (!select) return;
 
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#8b949e">Loading data...</td></tr>';
+    const camerasRes = await apiFetch(`${API_BASE}/api/v1/cameras`);
+    if (!camerasRes || !camerasRes.ok) return;
 
-    try {
-        const skipAmount = (currentPage - 1) * itemsPerPage;
-        const response = await fetch(`${API_BASE}/detections/?skip=${skipAmount}&limit=${itemsPerPage}`);
-        const data = await response.json();
+    const cameras = await camerasRes.json();
+    cameras.forEach(cam => {
+        const opt = document.createElement('option');
+        opt.value = cam.camera_id;
+        opt.textContent = `${cam.camera_id} — ${cam.location_name}`;
+        select.appendChild(opt);
+    });
+}
 
-        currentDataLength = data.length;
+function setupDefaultDateRange() {
+    const today = new Date();
+    const thirtyDaysAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+    document.getElementById('filter-end-date').value = today.toISOString().split('T')[0];
+    document.getElementById('filter-start-date').value = thirtyDaysAgo.toISOString().split('T')[0];
+}
 
-        if (data.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#8b949e">Tidak ada data di halaman ini.</td></tr>';
-        } else {
-            tbody.innerHTML = data.reverse().map(d => {
-                const timeString = new Date(d.timestamp).toLocaleString('id-ID', {
-                    timeZone: 'Asia/Jakarta',
-                    year: 'numeric', month: '2-digit', day: '2-digit',
-                    hour: '2-digit', minute: '2-digit', second: '2-digit'
-                });
+async function generateReport() {
+    const startDate = document.getElementById('filter-start-date').value;
+    const endDate = document.getElementById('filter-end-date').value;
+    const cameraId = document.getElementById('filter-camera').value;
 
-                let badgeClass = 'badge-type';
-                if (d.vehicle_type === 'motorcycle') badgeClass += ' type-moto';
-                if (d.vehicle_type === 'truck' || d.vehicle_type === 'bus') badgeClass += ' type-heavy';
-
-                return `
-                    <tr>
-                        <td>${timeString}</td>
-                        <td>${d.camera_id}</td>
-                        <td><span class="${badgeClass}">${d.vehicle_type.toUpperCase()}</span></td>
-                        <td>${d.direction}</td>
-                        <td>${(d.confidence * 100).toFixed(1)}%</td>
-                    </tr>
-                `;
-            }).join('');
-        }
-
-        indicator.textContent = `Halaman ${currentPage}`;
-        btnPrev.disabled = currentPage === 1;
-        btnNext.disabled = currentDataLength < itemsPerPage;
-
-    } catch (error) {
-        console.error("Gagal load reports:", error);
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#f85149">⚠️ Error mengambil data</td></tr>';
+    if (!startDate || !endDate) {
+        alert('Pilih tanggal mulai dan tanggal akhir.');
+        return;
     }
+
+    let url = `${API_BASE}/api/v1/density/history?start_date=${startDate}T00:00:00&end_date=${endDate}T23:59:59`;
+    if (cameraId) url += `&camera_id=${cameraId}`;
+
+    const res = await apiFetch(url);
+    if (!res || !res.ok) {
+        alert('Gagal mengambil data laporan.');
+        return;
+    }
+
+    const result = await res.json();
+    updateReportSummary(result.summary);
+    renderReportTable(result.data || []);
+    document.getElementById('export-buttons').style.display = 'flex';
+    reportParams = { startDate, endDate, cameraId };
 }
 
-function changePage(step) {
-    if (step === -1 && currentPage === 1) return;
-    currentPage += step;
-    loadReportsData();
+function updateReportSummary(summary) {
+    const summaryEl = document.getElementById('report-summary');
+    if (!summary || !summaryEl) return;
+
+    document.getElementById('sum-total-vehicles').textContent = summary.total_vehicles || 0;
+    document.getElementById('sum-avg-density').textContent = summary.average_density_ratio !== null
+        ? `${(summary.average_density_ratio * 100).toFixed(1)}%`
+        : '-';
+    document.getElementById('sum-peak-hour').textContent = summary.peak_hour || '-';
+    document.getElementById('sum-peak-day').textContent = summary.peak_day || '-';
+    summaryEl.style.display = 'grid';
 }
 
-// ==========================================
-// FITUR EXPORT CSV
-// ==========================================
-async function exportTodayCSV() {
+function renderReportTable(data) {
+    const container = document.getElementById('report-table-container');
+    if (!container) return;
+
+    if (!data || data.length === 0) {
+        container.innerHTML = '<div class="loading-state">Tidak ada data untuk rentang waktu ini.</div>';
+        return;
+    }
+
+    const rows = data.map(d => {
+        return `
+            <tr>
+                <td>${new Date(d.interval_start).toLocaleDateString('id-ID')}</td>
+                <td>${new Date(d.interval_start).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</td>
+                <td>${d.camera_id}</td>
+                <td>${d.total_vehicles ?? 0}</td>
+                <td>${d.inflow_count ?? 0}</td>
+                <td>${d.outflow_count ?? 0}</td>
+                <td>${d.density_ratio !== null ? `${(d.density_ratio * 100).toFixed(1)}%` : '-'}</td>
+                <td>${d.density_level || '-'}</td>
+            </tr>
+        `;
+    }).join('');
+
+    container.innerHTML = `
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Tanggal</th>
+                    <th>Waktu</th>
+                    <th>Kamera</th>
+                    <th>Total</th>
+                    <th>Inflow</th>
+                    <th>Outflow</th>
+                    <th>Density</th>
+                    <th>Level</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${rows}
+            </tbody>
+        </table>
+        <p style="margin-top:12px;color:#8b949e;">Menampilkan ${data.length} record.</p>
+    `;
+}
+
+async function exportReport(format) {
+    if (!reportParams) {
+        alert('Generate report dulu sebelum export.');
+        return;
+    }
+
+    const { startDate, endDate, cameraId } = reportParams;
+    let url = `${API_BASE}/api/v1/reports/export?format=${format}&start_date=${startDate}T00:00:00&end_date=${endDate}T23:59:59`;
+    if (cameraId) url += `&camera_id=${cameraId}`;
+
     try {
-        const today = getTodayWIB();
-        const res = await fetch(`${API_BASE}/detections/range?start=${today}&end=${today}&limit=10000`);
-        const data = await res.json();
-
-        if (data.length === 0) { alert("Tidak ada data untuk diexport hari ini."); return; }
-
-        const headers = ['Waktu (WIB)', 'Camera ID', 'Tipe Kendaraan', 'Arah', 'Confidence'];
-        const rows = data.map(d => {
-            const timeStr = new Date(d.timestamp).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' });
-            return `"${timeStr}","${d.camera_id}","${d.vehicle_type}","${d.direction}","${d.confidence}"`;
+        const token = localStorage.getItem('access_token');
+        const res = await fetch(url, {
+            headers: { 'Authorization': `Bearer ${token}` }
         });
 
-        const csv = [headers.join(','), ...rows].join('\n');
-        const blob = new Blob([csv], { type: 'text/csv' });
-        const url = URL.createObjectURL(blob);
+        if (!res.ok) {
+            alert('Export gagal.');
+            return;
+        }
+
+        const blob = await res.blob();
+        const downloadUrl = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = url;
-        a.download = `STMS_Report_${today}.csv`;
+        a.href = downloadUrl;
+        a.download = `stms_report_${startDate}_${endDate}.${format}`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        URL.revokeObjectURL(downloadUrl);
     } catch (err) {
-        console.error(err);
-        alert('Gagal membuat file CSV.');
+        alert('Export gagal: ' + err.message);
     }
 }
 
-// ==========================================
-// FITUR EXPORT PDF (FIXED DYNAMIC LOADING)
-// ==========================================
-async function exportToPDF() {
-    // 1. Cek apakah library sudah terload di window
-    if (typeof window.jspdf === 'undefined') {
-        alert("Library PDF sedang dimuat, silakan klik sekali lagi dalam 2 detik...");
-
-        // Load library secara dinamis
-        const loadScript = (src) => new Promise((resolve) => {
-            const s = document.createElement('script');
-            s.src = src;
-            s.onload = resolve;
-            document.body.appendChild(s);
-        });
-
-        await loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js");
-        await loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js");
-        return; // Hentikan fungsi agar user bisa klik ulang setelah library siap
-    }
-
-    // 2. Jika library sudah ada, eksekusi pembuatan PDF
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-
-    doc.setFontSize(18);
-    doc.text("Laporan Deteksi Kendaraan", 14, 20);
-
-    doc.autoTable({
-        html: '#reports-table',
-        startY: 30,
-        theme: 'striped',
-        headStyles: { fillColor: [209, 36, 36] }
-    });
-
-    doc.save(`Laporan_Deteksi_${new Date().toISOString().split('T')[0]}.pdf`);
+function initReportsScript() {
+    initReportsPage();
+    document.getElementById('filter-camera')?.addEventListener('change', () => { });
+    window.generateReport = generateReport;
+    window.exportReport = exportReport;
 }
 
-loadReportsData();
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initReportsScript);
+} else {
+    initReportsScript();
+}
