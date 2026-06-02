@@ -51,6 +51,8 @@ class Camera(Base):
     road_capacity = Column(Integer, nullable=False, default=50)
     direction = Column(String(20), nullable=False, default="Bidirectional")
     status = Column(String(10), nullable=False, default='active')
+    stream_url = Column(String(255), nullable=True)       # RTSP / DroidCam / file path
+    virtual_line_y = Column(Integer, nullable=True, default=300)  # counting line Y-position (px)
     created_at = Column(TIMESTAMP, nullable=False, server_default=func.now())
     
     # Relationships to other tables

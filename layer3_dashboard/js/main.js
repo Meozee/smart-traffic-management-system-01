@@ -1,13 +1,17 @@
 // Konfigurasi Global
 const API_URL = "http://localhost:8000/api/v1";
-const BASE_PATH = window.location.pathname.includes('/layer3_dashboard/') ? '' : 'layer3_dashboard/';
+
+// BASE_PATH = '' karena Nginx meng-serve layer3_dashboard/ sebagai docroot (/)
+// docker-compose: volumes: ./layer3_dashboard:/usr/share/nginx/html:ro
+// Semua path resource (pages/, js/) langsung relatif dari root.
+const BASE_PATH = '';
 
 let lastAlertId = 0;
 
 // Fungsi util: tanggal hari ini di WIB (YYYY-MM-DD)
 function getTodayWIB() {
     const now = new Date();
-    const wibOffset = 7 * 60; // menit
+    const wibOffset = 7 * 60;
     const localOffset = now.getTimezoneOffset();
     const wibTime = new Date(now.getTime() + (wibOffset + localOffset) * 60000);
     return wibTime.toISOString().split('T')[0];
@@ -26,7 +30,7 @@ setInterval(() => {
 function checkAuth() {
     const token = localStorage.getItem("access_token");
     if (!token && !window.location.href.includes("login.html")) {
-        window.location.href = BASE_PATH + "login.html";
+        window.location.href = '/login.html';   // absolute path — tidak bergantung BASE_PATH
     }
     return token;
 }
