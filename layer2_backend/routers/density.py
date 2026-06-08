@@ -2,8 +2,9 @@
 Smart Traffic Monitoring System (STMS) — Density Router
 
 Endpoints untuk membaca data traffic density (real-time & history).
-Semua endpoint dilindungi JWT. Summary history dihitung secara in-memory
-dari result query untuk efisiensi dan portabilitas.
+Perbaikan Audit:
+ - Menambahkan 'supervisor' pada role akses /history agar grafik dashboard tidak crash 
+   saat diakses oleh petugas lapangan.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -30,21 +31,12 @@ HARI_ID = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"]
 @router.get(
     "/realtime",
     response_model=List[schemas.DensityResponse],
-    summary="Ambil density terbaru per kamera (real-time)",
-    description=(
-        "Mengembalikan 1 record TRAFFIC_DENSITY terbaru (berdasarkan interval_end MAX) "
-        "untuk setiap kamera yang terdaftar. Return [] jika belum ada data."
-    )
+    summary="Ambil density terbaru per kamera (real-time)"
 )
 def get_realtime_density(
     db: Session = Depends(get_db),
     current_user: models.UserAccount = Depends(require_role("supervisor", "management", "admin"))
 ):
-    """
-    Subquery: MAX(interval_end) per camera_id → join ke TrafficDensity
-    untuk mendapatkan record terbaru tiap kamera.
-    """
-    # Subquery: cari interval_end terbaru untuk tiap camera_id
     subq = (
         db.query(
             models.TrafficDensity.camera_id,
@@ -54,7 +46,6 @@ def get_realtime_density(
         .subquery()
     )
 
-    # Join ke tabel utama untuk ambil full row
     results = (
         db.query(models.TrafficDensity)
         .join(
@@ -65,7 +56,7 @@ def get_realtime_density(
         .all()
     )
 
-    return results  # FastAPI serializes to [] automatically if empty
+    return results
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -74,20 +65,16 @@ def get_realtime_density(
 
 @router.get(
     "/history",
-    summary="Ambil history density dalam rentang tanggal",
-    description=(
-        "Mengembalikan semua record TRAFFIC_DENSITY dalam rentang [start_date, end_date] "
-        "beserta summary statistik. Return {data:[], summary:null} jika tidak ada data."
-    )
+    summary="Ambil history density dalam rentang tanggal"
 )
 def get_density_history(
     start_date: datetime = Query(..., description="Batas awal rentang (ISO 8601, UTC)"),
     end_date: datetime = Query(..., description="Batas akhir rentang (ISO 8601, UTC)"),
     camera_id: Optional[str] = Query(None, description="Filter per camera_id (opsional)"),
     db: Session = Depends(get_db),
-    current_user: models.UserAccount = Depends(require_role("management", "admin"))
+    # FIX: Menambahkan 'supervisor' agar grafik bisa dimuat oleh staf lapangan
+    current_user: models.UserAccount = Depends(require_role("supervisor", "management", "admin"))
 ):
-    # Validasi: start harus <= end
     if start_date > end_date:
         raise HTTPException(
             status_code=400,
@@ -98,23 +85,18 @@ def get_density_history(
             }
         )
 
-    # Build query dengan filter rentang waktu
     query = db.query(models.TrafficDensity).filter(
         models.TrafficDensity.interval_start >= start_date,
         models.TrafficDensity.interval_end <= end_date
     )
 
-    # Optional filter per kamera
     if camera_id:
         query = query.filter(models.TrafficDensity.camera_id == camera_id)
 
     records = query.order_by(models.TrafficDensity.interval_start.asc()).all()
 
-    # Jika tidak ada data → kembalikan struktur kosong
     if not records:
         return {"data": [], "summary": None}
-
-    # ── Kalkulasi summary ─────────────────────────────────────────────────────
 
     # 1. Total kendaraan
     total_vehicles = sum(r.total_vehicles for r in records)
@@ -123,7 +105,7 @@ def get_density_history(
     ratios = [r.density_ratio for r in records if r.density_ratio is not None]
     average_density_ratio = round(statistics.mean(ratios), 4) if ratios else 0.0
 
-    # 3. Peak hour: group by jam (interval_start.hour), cari jam dengan rata-rata density_ratio tertinggi
+    # 3. Peak hour
     hour_groups: dict = defaultdict(list)
     for r in records:
         if r.density_ratio is not None:
@@ -135,7 +117,7 @@ def get_density_history(
     else:
         peak_hour = None
 
-    # 4. Peak day: group by tanggal, cari tanggal dengan sum total_vehicles terbanyak
+    # 4. Peak day
     day_groups: dict = defaultdict(int)
     for r in records:
         day_key = r.interval_start.date()
@@ -147,7 +129,7 @@ def get_density_history(
     else:
         peak_day = None
 
-    # 5. Density distribution (persentase tiap level dari total record)
+    # 5. Density distribution
     total_recs = len(records)
     dist_counts: dict = {"Low": 0, "Medium": 0, "High": 0}
     for r in records:
@@ -159,7 +141,6 @@ def get_density_history(
         for k, v in dist_counts.items()
     }
 
-    # Serialize records ke Pydantic schema
     serialized_data = [schemas.DensityResponse.model_validate(r) for r in records]
 
     summary = schemas.ReportSummary(

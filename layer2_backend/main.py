@@ -67,6 +67,7 @@ async def lifespan(app: FastAPI):
     # ─────── STARTUP ───────
     # Initialize database (create tables)
     database.init_db()
+    database.create_default_admin()
 
     # Initialize default camera jika belum ada
     init_default_cameras()

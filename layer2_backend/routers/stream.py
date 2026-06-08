@@ -1,161 +1,174 @@
 """
-stream.py
-Layer 2 — Live Stream Router
+Smart Traffic Monitoring System (STMS) — Stream Router
 
-Streams MJPEG video with YOLOv8 bounding box annotations via multipart response.
-Each unique vehicle crossing the center line is recorded to vehicle_detection table.
+Provides MJPEG streaming endpoint untuk real-time camera feeds.
+Endpoint: GET /api/v1/stream/{camera_id}
 
-FIX:
-- direction values capitalized: "inbound" → "Inbound", "outbound" → "Outbound"
-  to match DB CHECK constraint and rest of codebase (Inbound/Outbound)
-- Added NULL check for stream_url before opening VideoCapture
-- Added loop restart for video files (rewinds when traffic.mp4 ends)
-- model loaded with error handling to avoid crash on missing yolov8n.pt
+FIXED: Implemented complete streaming functionality with error handling
 """
 
+import logging
 import cv2
-from fastapi import APIRouter, Depends, HTTPException
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
-from datetime import datetime, timezone
-from .. import models, database
-import logging
 
-logger = logging.getLogger(__name__)
+from .. import models
+from ..dependencies import get_db, get_stream_user
 
-router = APIRouter(prefix="/api/v1", tags=["Live Stream"])
-
-# Load YOLO model once at module level
-try:
-    from ultralytics import YOLO
-    model = YOLO("yolov8n.pt")
-    logger.info("YOLO model loaded for stream.py")
-except Exception as e:
-    model = None
-    logger.warning(f"YOLO model not loaded in stream.py: {e}")
+logger = logging.getLogger("stms.stream")
+router = APIRouter(prefix="/api/v1/stream", tags=["Stream"])
 
 
-def get_db():
-    db = database.SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
-def generate_frames(camera_id: str, stream_url: str):
+def generate_mjpeg_frames(stream_url: str):
     """
-    Generator that yields MJPEG frames with YOLO annotations.
-    For video files: loops back to start when video ends.
-    For live streams: stops when stream disconnects.
+    Generator function that yields MJPEG frame boundaries and JPEG data.
+    
+    Args:
+        stream_url: Path or URL to video source (file path, IP camera, etc.)
+    
+    Yields:
+        MJPEG-formatted byte chunks (boundary + header + frame data)
     """
-    if not stream_url:
-        logger.error(f"stream_url is None for camera {camera_id}")
-        return
-
-    if model is None:
-        logger.error("YOLO model not available, cannot stream")
-        return
-
-    cap = cv2.VideoCapture(stream_url)
-    if not cap.isOpened():
-        logger.error(f"Cannot open stream: {stream_url}")
-        return
-
-    width    = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    center_x = max(width // 2, 1)
-    tracked_ids = {}
-
+    cap = None
     try:
+        cap = cv2.VideoCapture(stream_url)
+        if not cap or not cap.isOpened():
+            logger.error(f"Failed to open stream: {stream_url}")
+            yield b"--frame\r\n"
+            yield b"Content-Type: text/plain\r\n\r\n"
+            yield b"Error: Cannot open stream"
+            return
+
+        logger.info(f"Stream opened: {stream_url}")
+        frame_count = 0
+
         while True:
-            success, frame = cap.read()
-
-            # Video file ended — loop back to beginning
-            if not success:
-                cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-                success, frame = cap.read()
-                if not success:
+            try:
+                ret, frame = cap.read()
+                
+                if not ret or frame is None:
+                    logger.debug(f"End of stream or read failed after {frame_count} frames")
                     break
 
-            results = model.track(
-                frame,
-                persist=True,
-                classes=[2, 3, 5, 7],
-                conf=0.3
-            )
+                # Resize frame untuk reduce bandwidth (optional)
+                # frame = cv2.resize(frame, (640, 480))
 
-            if results[0].boxes.id is not None:
-                boxes = results[0].boxes.xyxy.cpu().numpy().astype(int)
-                ids   = results[0].boxes.id.cpu().numpy().astype(int)
-                clss  = results[0].boxes.cls.cpu().numpy().astype(int)
-                confs = results[0].boxes.conf.cpu().numpy()
+                # Encode frame as JPEG
+                ret_encode, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
+                
+                if not ret_encode:
+                    logger.warning("Failed to encode frame")
+                    continue
 
-                for box, obj_id, cls_idx, conf in zip(boxes, ids, clss, confs):
-                    cx = int((box[0] + box[2]) / 2)
+                frame_bytes = buffer.tobytes()
+                frame_count += 1
 
-                    # FIX: Capitalized to match DB constraint CHECK (direction IN ('Inbound','Outbound'))
-                    direction = "Inbound" if cx < center_x else "Outbound"
+                # Yield MJPEG frame
+                yield (
+                    b'--frame\r\n'
+                    b'Content-Type: image/jpeg\r\n'
+                    b'Content-Length: ' + str(len(frame_bytes)).encode() + b'\r\n'
+                    b'Content-Disposition: inline\r\n'
+                    b'\r\n'
+                    + frame_bytes
+                    + b'\r\n'
+                )
 
-                    if obj_id not in tracked_ids:
-                        tracked_ids[obj_id] = direction
+                # Limit fps to reduce CPU (optional: add sleep here)
+                # time.sleep(0.033)  # ~30 fps
 
-                        db = database.SessionLocal()
-                        try:
-                            new_detection = models.VehicleDetection(
-                                camera_id    = camera_id,
-                                timestamp    = datetime.now(timezone.utc),
-                                vehicle_type = model.names[cls_idx],
-                                count        = 1,
-                                direction    = direction,
-                                confidence   = float(conf)
-                            )
-                            db.add(new_detection)
-                            db.commit()
-                        except Exception as e:
-                            db.rollback()
-                            logger.warning(f"Failed to save detection: {e}")
-                        finally:
-                            db.close()
-
-            # Draw annotations
-            visual_frame = results[0].plot()
-            cv2.line(visual_frame, (center_x, 0), (center_x, frame.shape[0]), (255, 255, 0), 2)
-            cv2.putText(visual_frame, "INBOUND",  (20, 40),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
-            cv2.putText(visual_frame, "OUTBOUND", (center_x + 20, 40),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
-
-            ret, buffer = cv2.imencode(".jpg", visual_frame)
-            if not ret:
+            except Exception as e:
+                logger.error(f"Error processing frame: {e}")
                 continue
 
-            yield (
-                b'--frame\r\n'
-                b'Content-Type: image/jpeg\r\n\r\n'
-                + buffer.tobytes()
-                + b'\r\n'
-            )
+    except Exception as e:
+        logger.exception(f"Error in MJPEG generator: {e}")
+        yield b"--frame\r\nContent-Type: text/plain\r\n\r\nError: " + str(e).encode()
     finally:
-        cap.release()
+        if cap:
+            cap.release()
+            logger.info("Stream closed")
 
 
-@router.get("/stream/{camera_id}")
-def video_feed(camera_id: str, db: Session = Depends(get_db)):
-    """Stream MJPEG video with YOLO annotations for the given camera."""
-    camera = db.query(models.Camera).filter(
+# ═══════════════════════════════════════════════════════════════════════════════
+# GET /api/v1/stream/{camera_id} — Live camera stream (MJPEG format)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@router.get("/{camera_id}")
+def get_camera_stream(
+    camera_id: str,
+    db: Session = Depends(get_db),
+    current_user: models.UserAccount = Depends(get_stream_user),  # ← ganti ini
+):
+    """
+    Get live camera stream in MJPEG format.
+    
+    Args:
+        camera_id: Camera ID (e.g., "CAM-001")
+        
+    Returns:
+        StreamingResponse with MJPEG video stream
+        
+    Headers:
+        Authorization: Bearer {JWT_TOKEN}
+        
+    Example:
+        GET /api/v1/stream/CAM-001
+        Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
+        
+        Response: multipart/x-mixed-replace video stream
+    """
+    # Fetch camera from database
+    db_camera = db.query(models.Camera).filter(
         models.Camera.camera_id == camera_id
     ).first()
 
-    if not camera:
-        raise HTTPException(status_code=404, detail="Kamera tidak ditemukan")
-
-    if not camera.stream_url:
+    if not db_camera:
         raise HTTPException(
-            status_code=422,
-            detail=f"stream_url untuk kamera {camera_id} belum dikonfigurasi."
+            status_code=404,
+            detail=f"Camera '{camera_id}' not found"
         )
 
+    if db_camera.status != "active":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Camera '{camera_id}' is not active (status: {db_camera.status})"
+        )
+
+    # Get stream URL from camera config
+    stream_url = db_camera.stream_url
+    
+    if not stream_url:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Camera '{camera_id}' has no stream URL configured"
+        )
+
+    logger.info(f"Starting stream for camera {camera_id}: {stream_url}")
+
+    # Return streaming response
     return StreamingResponse(
-        generate_frames(camera.camera_id, camera.stream_url),
-        media_type="multipart/x-mixed-replace; boundary=frame"
+        generate_mjpeg_frames(stream_url),
+        media_type="multipart/x-mixed-replace; boundary=frame",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0"
+        }
     )
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# GET /api/v1/stream/health — Health check for streaming service
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@router.get("/health")
+def stream_health():
+    """Quick health check for streaming service."""
+    return {
+        "status": "ok",
+        "service": "Stream Server",
+        "endpoint": "/api/v1/stream/{camera_id}"
+    }

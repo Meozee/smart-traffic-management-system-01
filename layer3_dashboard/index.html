@@ -1,48 +1,67 @@
 <!DOCTYPE html>
-<html lang="en">
-
+<html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>STMS Dashboard — Central Aceh</title>
-    <link rel="stylesheet" href="style.css">
     <script>
         if (!!window.MSInputMethodContext && !!document.documentMode) {
-            document.write(
-                '⚠️ Browser Anda (Internet Explorer) tidak didukung. ' +
-                'Gunakan Google Chrome, Mozilla Firefox, atau Microsoft Edge untuk pengalaman terbaik.'
-            );
+            document.write('⚠️ Browser Anda (Internet Explorer) tidak didukung. Gunakan Chrome, Firefox, atau Edge.');
         }
     </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
     <script src="js/api.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 </head>
-
 <body>
+
     <nav class="topnav">
-        <div class="logo">🚦 STMS <span>Central Aceh</span></div>
-        <div class="nav-right">
-            <div id="status-badge" class="badge">System Online</div>
-            <div id="clock">--:--:--</div>
+        <div class="logo">
+            <div class="logo-icon">🚦</div>
+            <div>
+                <div>STMS</div>
+                <div class="logo-sub">Central Aceh Regency</div>
+            </div>
+        </div>
+        <div class="nav-divider"></div>
+        <div class="topnav-links">
+            <button class="nav-link active" data-page="dashboard" onclick="loadPage(event,'dashboard')">
+                <span class="icon">◈</span> Dashboard
+            </button>
+            <button class="nav-link" data-page="cameras" onclick="loadPage(event,'cameras')">
+                <span class="icon">⊡</span> Live Cameras
+            </button>
+            <button class="nav-link" data-page="reports" onclick="loadPage(event,'reports')">
+                <span class="icon">◎</span> Reports
+            </button>
+            <button class="nav-link" data-page="settings" onclick="loadPage(event,'settings')">
+                <span class="icon">◧</span> Settings
+            </button>
+        </div>
+        <div class="topnav-right">
+            <div class="status-pill">
+                <div id="status-badge" class="dot"></div>
+                System Online
+            </div>
+            <div class="clock" id="clock">--:--:--</div>
+            <button onclick="logout()" class="btn btn-ghost btn-sm">Logout</button>
         </div>
     </nav>
 
-    <div class="wrapper">
-        <aside class="sidebar">
-            <button class="nav-btn active" data-page="dashboard" onclick="loadPage(event, 'dashboard')">📊
-                Dashboard</button>
-            <button class="nav-btn" data-page="cameras" onclick="loadPage(event, 'cameras')">📹 Live Cameras</button>
-            <button class="nav-btn" data-page="reports" onclick="loadPage(event, 'reports')">📑 Reports &
-                History</button>
-            <button class="nav-btn" data-page="settings" onclick="loadPage(event, 'settings')">⚙️ Settings</button>
+    <div class="body-wrap">
+        <aside class="sidebar" id="camera-sidebar">
+            <div class="sidebar-label">Locations</div>
+            <div class="divider" style="margin-top:auto"></div>
+            <div class="sidebar-label">Refresh · 5s</div>
+            <div class="sidebar-label" id="lastUpdate">Updated --:--</div>
         </aside>
 
-        <main class="main-content" id="app-content">
-            <div class="loading-state">Memuat sistem...</div>
-        </main>
+        <main class="main" id="app-content">
+            </main>
     </div>
 
     <script src="js/main.js"></script>
 </body>
-
 </html>
